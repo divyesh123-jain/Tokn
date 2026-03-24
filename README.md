@@ -1,36 +1,282 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tokn
 
-## Getting Started
+Motion Design System for Product Teams
 
-First, run the development server:
+Tokn is the motion layer between design and code: teams define motion once as tokens, then consume it everywhere through generated SDKs and guardrails.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Product System (v1)
+
+### One-line Pitch
+
+Tokn lets product teams define, share, and enforce motion tokens across their app the same way design tokens standardized color and spacing.
+
+### Product Thesis
+
+- Inconsistent hardcoded animation values create invisible UX debt.
+- Designers currently cannot ship motion intent into production code directly.
+- Motion should be a first-class design system primitive, not per-component guesswork.
+- A tokenized motion system plus SDK distribution is the fastest path to consistency at scale.
+
+### Core Jobs to Be Done
+
+- Define a motion vocabulary once per team.
+- Preview impact before shipping to production.
+- Consume tokens in code with zero manual interpretation.
+- Enforce token usage and flag hardcoded animation values.
+- Version and roll back motion safely.
+
+## User Segments
+
+### Primary
+
+- Frontend developers who need fast, consistent, production-ready motion APIs.
+- Product designers who need direct control over motion intent and review loops.
+
+### Secondary
+
+- Design system owners who need policy and enforcement.
+- PMs and founders who need polished UX without custom motion workflows.
+
+## Information Architecture
+
+1. Workspaces
+2. Token sets
+3. Token editor
+4. Live preview lab
+5. SDK packages
+6. Version history
+7. Enforcement and diagnostics
+8. Team settings and permissions
+
+## Motion Token Model
+
+### Token Categories
+
+- `motion.duration.*`
+- `motion.easing.*`
+- `motion.spring.*`
+- `motion.enter.*`
+- `motion.exit.*`
+- `motion.feedback.*`
+- `motion.attention.*`
+
+### Canonical Token Shape
+
+```ts
+type MotionToken = {
+  id: string
+  name: string
+  category:
+    | "duration"
+    | "easing"
+    | "spring"
+    | "enter"
+    | "exit"
+    | "feedback"
+    | "attention"
+  value: Record<string, unknown>
+  intent: string
+  platforms: ("web" | "ios" | "android")[]
+  version: string
+  status: "draft" | "published" | "deprecated"
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Example Composite Tokens
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```json
+{
+  "motion.enter.default": {
+    "duration": 280,
+    "easing": "cubic-bezier(0.16, 1, 0.3, 1)",
+    "from": { "opacity": 0, "y": 12 },
+    "to": { "opacity": 1, "y": 0 }
+  },
+  "motion.spring.snappy": {
+    "type": "spring",
+    "stiffness": 420,
+    "damping": 30,
+    "mass": 0.9
+  }
+}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Product Capabilities
 
-## Learn More
+### 1) Token Authoring
 
-To learn more about Next.js, take a look at the following resources:
+- Create, edit, deprecate, and group motion tokens.
+- Rich fields for duration, easing curves, spring physics, transforms, and opacity.
+- Intent descriptions and usage guidance per token.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2) Preview and Simulation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Component-level previews (modal, toast, sheet, button, nav).
+- Side-by-side compare between draft and published token sets.
+- Shareable preview links for designer, PM, and engineer approvals.
 
-## Deploy on Vercel
+### 3) SDK Generation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Auto-generate installable token SDKs.
+- Type-safe exports for Framer Motion, CSS, and GSAP-friendly configs.
+- Versioned package output (`@tokn/tokens` or workspace-scoped package names).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 4) Governance and Enforcement
+
+- Rule engine for forbidden hardcoded durations/easings.
+- IDE diagnostics and CI checks with actionable fix suggestions.
+- Workspace policy: allowlist/denylist, deprecation windows, migration hints.
+
+### 5) Versioning and Release
+
+- Semantic versioning with release notes.
+- Diff views for changed token values and behavioral impact.
+- Rollback support per workspace environment.
+
+## MVP Scope (Now)
+
+### Must Have
+
+- Workspace creation and member roles.
+- Motion token CRUD for 8-12 core tokens.
+- Publish flow and immutable versions.
+- SDK export for web (JSON + TypeScript).
+- Simple component preview lab.
+
+### Should Have
+
+- Framer Motion config generator.
+- Token deprecation metadata.
+- Basic lint rule for hardcoded motion values.
+
+### Won't Have (v1)
+
+- Complex timeline editor.
+- Native runtime SDKs (iOS/Android).
+- Marketplace/public token discovery.
+
+## Feature System Backlog (Execution Order)
+
+1. Authentication, workspaces, roles
+2. Token schema and persistence
+3. Authoring UI and validation
+4. Publish/version engine
+5. SDK generator and package delivery
+6. Preview lab and share links
+7. Lint/CI enforcement package
+8. Team analytics and adoption reporting
+
+## Product Style Foundation
+
+This gives us a shared language before visual implementation.
+
+### Brand Attributes
+
+- Precise
+- Kinetic
+- Systemic
+- Premium
+
+### Voice
+
+- Confident, technical, concise.
+- Explain motion intent in plain language plus exact values.
+
+### Design Principles
+
+- Motion is semantic, not decorative.
+- Every animation has an intent and token owner.
+- Faster defaults, deliberate exceptions.
+- Accessibility and comfort by default.
+
+## Typography and Theme System (Initial Direction)
+
+### Typography Roles
+
+- `display`: marketing and hero motion statements.
+- `heading`: product module titles.
+- `body`: docs and settings copy.
+- `mono`: token keys, code snippets, and diffs.
+
+### Theme Tokens (v1)
+
+- `theme.color.bg.*`
+- `theme.color.fg.*`
+- `theme.color.accent.*`
+- `theme.color.border.*`
+- `theme.radius.*`
+- `theme.shadow.*`
+
+### Motion-to-Theme Interaction Rules
+
+- Dark mode reduces blur and heavy shadows, keeps timing parity.
+- High contrast mode favors opacity/position transitions over scale jitter.
+- Reduced motion maps composite tokens to low-distance, low-duration variants.
+
+## Technical System Blueprint
+
+### Suggested Monorepo Shape
+
+```txt
+apps/
+  web/                      # Tokn dashboard (Next.js)
+packages/
+  token-schema/             # Zod/TS schema + validation logic
+  token-engine/             # merge, diff, version, deprecate
+  sdk-generator/            # TS/JSON/CSS/Framer outputs
+  eslint-plugin-tokn/       # hardcoded motion rule + autofix hints
+  preview-components/       # canonical demo components
+```
+
+### Suggested Data Model
+
+- `workspace`
+- `member`
+- `token_set`
+- `token`
+- `release`
+- `release_asset`
+- `preview_snapshot`
+- `policy_rule`
+
+### API Surface (Draft)
+
+- `POST /workspaces`
+- `GET /workspaces/:id/tokens`
+- `POST /workspaces/:id/tokens`
+- `POST /workspaces/:id/publish`
+- `GET /workspaces/:id/releases`
+- `GET /workspaces/:id/sdk/:version`
+- `POST /workspaces/:id/previews`
+
+## Success Metrics
+
+- Token adoption rate (`tokenized animations / total animations`)
+- Hardcoded motion violations per PR
+- Time to ship motion refresh
+- New engineer onboarding time to first compliant animation
+- Preview-to-publish conversion rate
+
+## Risks and Countermeasures
+
+- Designers may not trust engineering previews -> build high-fidelity canonical components first.
+- Teams may bypass SDK for edge cases -> add escape-hatch policy with mandatory intent annotation.
+- Overly rigid tokens can block creativity -> support local overrides with auditable metadata.
+
+## Immediate Build Plan
+
+1. Lock token schema and naming.
+2. Build token CRUD + publish flow.
+3. Generate typed SDK output.
+4. Add 6-8 canonical preview components.
+5. Add lint rule for hardcoded duration/easing values.
+
+## Next Session Checklist
+
+Pick one and we implement directly:
+
+- Token schema (`packages/token-schema`)
+- Dashboard information architecture (`apps/web`)
+- Typography system and theme tokens
+- SDK generator output format
+- Enforcement rule spec (`eslint-plugin-tokn`)
