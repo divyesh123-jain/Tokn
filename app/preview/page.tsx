@@ -153,9 +153,10 @@ export default function PreviewPage() {
         <article className="rounded-xl border border-border bg-muted/50 p-4">
           <h3 className="text-xl font-semibold text-foreground">Overview</h3>
           <p className="mt-2 text-sm text-muted-foreground">
-            The preview panel renders canonical UI components and replays motion using current
-            token values. Slider updates in the editor trigger immediate remount/replay, so value
-            changes are visible within one frame.
+            The live preview is the center panel of the token editor. It shows real React components
+            animating with the exact values from the property sliders - updating on every change,
+            replaying from initial state each time. It bridges the gap between a number on a slider
+            and the physical feel of the animation.
           </p>
         </article>
 
@@ -202,45 +203,59 @@ export default function PreviewPage() {
           </div>
         </article>
 
-        <article className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full min-w-[740px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="bg-muted/40">
-                <th className="border-b border-border px-3 py-2 font-semibold text-foreground">
-                  What
-                </th>
-                <th className="border-b border-border px-3 py-2 font-semibold text-foreground">
-                  How it works
-                </th>
-                <th className="border-b border-border px-3 py-2 font-semibold text-foreground">
-                  Why it matters
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {previewTargets.map((item) => (
-                <tr key={`row-${item.component}`} className="align-top">
-                  <td className="border-b border-border px-3 py-2 font-medium text-foreground">
-                    {item.what}
-                  </td>
-                  <td className="border-b border-border px-3 py-2 text-muted-foreground">
-                    {item.howItWorks}
-                  </td>
-                  <td className="border-b border-border px-3 py-2 text-muted-foreground">
-                    {item.whyItMatters}
-                  </td>
+        <article className="rounded-xl border border-border bg-background p-4">
+          <h3 className="text-xl font-semibold text-foreground">
+            The 5 preview components and why each one
+          </h3>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[740px] border-collapse text-left text-sm">
+              <thead>
+                <tr className="bg-muted/40">
+                  <th className="border-b border-border px-3 py-2 font-semibold text-foreground">
+                    What
+                  </th>
+                  <th className="border-b border-border px-3 py-2 font-semibold text-foreground">
+                    How it works
+                  </th>
+                  <th className="border-b border-border px-3 py-2 font-semibold text-foreground">
+                    Why it matters
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {previewTargets.map((item) => (
+                  <tr key={`row-${item.component}`} className="align-top">
+                    <td className="border-b border-border px-3 py-2 font-medium text-foreground">
+                      {item.what}
+                    </td>
+                    <td className="border-b border-border px-3 py-2 text-muted-foreground">
+                      {item.howItWorks}
+                    </td>
+                    <td className="border-b border-border px-3 py-2 text-muted-foreground">
+                      {item.whyItMatters}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article className="rounded-xl border border-border bg-background p-4">
-          <h3 className="text-xl font-semibold text-foreground">Success metric</h3>
+          <h3 className="text-xl font-semibold text-foreground">
+            How replay works technically
+          </h3>
           <p className="mt-2 text-sm text-muted-foreground">
-            Users adjust any token value and the selected preview updates and replays in under
-            16ms, with no perceptible lag between control input and rendered motion.
+            When a slider value changes, a counter increments. This counter is used as the React
+            key prop on the preview wrapper component. React sees the key change, unmounts the old
+            component completely, and mounts a fresh one - triggering Framer Motion&apos;s initial
+            state from scratch. This approach was chosen because:
           </p>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+            <li>It requires zero animation control APIs - no useAnimation, no animate(), no imperative code.</li>
+            <li>It mirrors exactly what happens in production when a component first mounts - the preview IS the production behavior.</li>
+            <li>It works for all animation types including spring, which cannot be &ldquo;rewound&rdquo; through controls.</li>
+          </ol>
         </article>
       </section>
     </AppShell>
