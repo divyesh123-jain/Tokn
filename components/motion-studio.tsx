@@ -2,10 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Copy, Play, Plus, Search } from "lucide-react";
+import { Check, Copy, MoreHorizontal, Pencil, Play, Plus, Search, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -88,8 +94,24 @@ export function MotionStudio() {
 }
 
 function TokenListPanel() {
-  const { tokens, selectedId, searchQuery, setSearch, selectToken, createToken } =
-    useTokenStore();
+  const {
+    tokens,
+    selectedId,
+    searchQuery,
+    setSearch,
+    selectToken,
+    createToken,
+    updateToken,
+    duplicateToken,
+    deleteToken,
+    softDeleteToken,
+    hasPublishedUsage,
+  } = useTokenStore();
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
+  const [inlineName, setInlineName] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const inlineInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -104,6 +126,45 @@ function TokenListPanel() {
       }))
       .filter((g) => g.items.length > 0);
   }, [filtered]);
+
+  useEffect(() => {
+    if (editingTokenId && inlineInputRef.current) {
+      inlineInputRef.current.focus();
+      inlineInputRef.current.select();
+    }
+  }, [editingTokenId]);
+
+  function startRename(tokenId: string, currentName: string) {
+    setDeleteConfirmId(null);
+    setEditingTokenId(tokenId);
+    setInlineName(currentName);
+  }
+
+  function submitRename() {
+    if (!editingTokenId) return;
+    updateToken(editingTokenId, { name: inlineName });
+    setEditingTokenId(null);
+    setInlineName("");
+  }
+
+  function cancelRename() {
+    setEditingTokenId(null);
+    setInlineName("");
+  }
+
+  function requestDelete(tokenId: string) {
+    setEditingTokenId(null);
+    setDeleteConfirmId(tokenId);
+  }
+
+  function confirmDelete(tokenId: string) {
+    if (hasPublishedUsage(tokenId)) {
+      softDeleteToken(tokenId);
+    } else {
+      deleteToken(tokenId);
+    }
+    setDeleteConfirmId(null);
+  }
 
   return (
     <aside className="flex w-[220px] flex-col border-r border-border bg-card">
@@ -138,37 +199,132 @@ function TokenListPanel() {
             {group.items.map((token) => {
               const sel = token.id === selectedId;
               const cfg = categoryConfig[token.category];
+              const isHovered = hoveredId === token.id;
+              const isEditing = editingTokenId === token.id;
+              const showMenu = sel || isHovered;
+              const showDeleteConfirm = deleteConfirmId === token.id;
               return (
-                <Button
+                <div
                   key={token.id}
-                  type="button"
-                  variant="ghost"
-                  onClick={() => selectToken(token.id)}
-                  className={cn(
-                    "h-auto w-full justify-start gap-2 rounded-lg px-2 py-1.5 text-left font-normal",
-                    sel ? "bg-[#EEEDFE] hover:bg-[#EEEDFE]" : "hover:bg-muted",
-                  )}
+                  className="relative"
+                  onMouseEnter={() => setHoveredId(token.id)}
+                  onMouseLeave={() => setHoveredId((current) => (current === token.id ? null : current))}
                 >
                   <div
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{
-                      backgroundColor: sel ? "#534AB7" : cfg.color,
-                    }}
-                  />
-                  <span
                     className={cn(
-                      "flex-1 truncate text-xs font-medium",
-                      sel ? "text-[#3C3489]" : "text-foreground",
+                      "flex items-center gap-1 rounded-lg px-2 py-1.5",
+                      sel ? "bg-[#EEEDFE]" : "hover:bg-muted",
                     )}
                   >
-                    {token.name || "untitled"}
-                  </span>
-                  <span className="shrink-0 text-[10px] font-mono text-[#888780]">
-                    {token.isSpring
-                      ? `stiff: ${token.springStiffness}`
-                      : `${token.durationMs}ms`}
-                  </span>
-                </Button>
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <div
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{
+                          backgroundColor: sel ? "#534AB7" : cfg.color,
+                        }}
+                      />
+                      {isEditing ? (
+                        <Input
+                          ref={inlineInputRef}
+                          value={inlineName}
+                          onChange={(event) => setInlineName(event.target.value)}
+                          onBlur={submitRename}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              submitRename();
+                            }
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              cancelRename();
+                            }
+                          }}
+                          className="h-6 flex-1 rounded border border-border px-1.5 py-1 font-mono text-xs"
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => selectToken(token.id)}
+                          className="flex min-w-0 flex-1 items-center text-left"
+                        >
+                        <span
+                          className={cn(
+                            "flex-1 truncate text-xs font-medium",
+                            sel ? "text-[#3C3489]" : "text-foreground",
+                          )}
+                        >
+                          {token.name || "untitled"}
+                        </span>
+                        </button>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={(event) => event.stopPropagation()}
+                          className={cn(
+                            "h-6 w-6 rounded-md text-[#888780] hover:bg-muted",
+                            showMenu ? "opacity-100" : "opacity-0",
+                          )}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" sideOffset={6} className="w-40">
+                        <DropdownMenuItem
+                          onClick={() => duplicateToken(token.id)}
+                          className="text-xs"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => startRename(token.id, token.name)}
+                          className="text-xs"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => requestDelete(token.id)}
+                          variant="destructive"
+                          className="text-xs"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  {showDeleteConfirm && (
+                    <div className="mt-1 rounded-lg border border-border bg-popover p-2 text-xs shadow-md">
+                      <p className="text-foreground">
+                        Delete {token.name || "untitled"}? This cannot be undone.
+                      </p>
+                      <div className="mt-2 flex items-center justify-end gap-1.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setDeleteConfirmId(null)}
+                          className="h-auto px-2 py-1 text-[11px]"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => confirmDelete(token.id)}
+                          className="h-auto px-2 py-1 text-[11px] text-red-600 hover:bg-red-50 hover:text-red-700"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -341,8 +497,16 @@ function PreviewComponent({ type }: { type: PreviewComponent }) {
 }
 
 function PropertiesPanel() {
-  const { tokens, selectedId, updateToken, codeFormat, setCodeFormat } =
-    useTokenStore();
+  const {
+    tokens,
+    updateToken,
+    codeFormat,
+    setCodeFormat,
+    duplicateToken,
+    nameFocusTargetId,
+    nameFocusSelectAll,
+    clearNameFocusRequest,
+  } = useTokenStore();
   const token = useSelectedToken();
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -359,10 +523,19 @@ function PropertiesPanel() {
   }, [token]);
 
   useEffect(() => {
-    if (token && token.name === "" && nameInputRef.current) {
+    if (!token || !nameInputRef.current) return;
+    if (token.name === "") {
       nameInputRef.current.focus();
+      return;
     }
-  }, [token?.id]);
+    if (nameFocusTargetId === token.id) {
+      nameInputRef.current.focus();
+      if (nameFocusSelectAll) {
+        nameInputRef.current.select();
+      }
+      clearNameFocusRequest();
+    }
+  }, [token, nameFocusTargetId, nameFocusSelectAll, clearNameFocusRequest]);
 
   if (!token) {
     return (
@@ -400,7 +573,19 @@ function PropertiesPanel() {
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-[10px] text-[#888780]">Name</label>
+          <div className="mb-1 flex items-center justify-between">
+            <label className="block text-[10px] text-[#888780]">Name</label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              title="Duplicate this token."
+              onClick={() => duplicateToken(token.id)}
+              className="h-6 w-6 rounded-md text-[#888780] hover:bg-muted"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </div>
           <div className="relative">
             <Input
               ref={nameInputRef}
