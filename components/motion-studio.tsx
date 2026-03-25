@@ -259,20 +259,22 @@ function TokenListPanel() {
                       )}
                     </div>
                     <DropdownMenu>
-                      <DropdownMenuTrigger>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={(event) => event.stopPropagation()}
-                          className={cn(
-                            "h-6 w-6 rounded-md text-[#888780] hover:bg-muted",
-                            showMenu ? "opacity-100" : "opacity-0",
-                          )}
-                        >
-                          <MoreHorizontal className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={(event) => event.stopPropagation()}
+                            className={cn(
+                              "h-6 w-6 rounded-md text-[#888780] hover:bg-muted",
+                              showMenu ? "opacity-100" : "opacity-0",
+                            )}
+                          >
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </Button>
+                        }
+                      />
                       <DropdownMenuContent align="end" sideOffset={6} className="w-40">
                         <DropdownMenuItem
                           onClick={() => duplicateToken(token.id)}
