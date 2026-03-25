@@ -4,6 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Copy, Play, Plus, Search } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import {
   type MotionTokenItem,
   type MotionTokenCategory,
@@ -80,7 +90,6 @@ export function MotionStudio() {
 function TokenListPanel() {
   const { tokens, selectedId, searchQuery, setSearch, selectToken, createToken } =
     useTokenStore();
-  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -99,7 +108,7 @@ function TokenListPanel() {
   return (
     <aside className="flex w-[220px] flex-col border-r border-border bg-card">
       <div className="p-4 pb-3">
-        <div className="flex items-center gap-2 mb-4">
+        <div className="mb-4 flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-[10px] font-bold text-primary-foreground">
             TK
           </div>
@@ -107,12 +116,12 @@ function TokenListPanel() {
           <span className="text-[10px] text-muted-foreground">v1.0</span>
         </div>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
             value={searchQuery}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search tokens…"
-            className="w-full rounded-lg bg-background py-1.5 pl-8 pr-3 text-xs text-foreground outline-none placeholder:text-muted-foreground"
+            className="h-auto border-0 bg-background py-1.5 pl-8 pr-3 text-xs shadow-none focus-visible:ring-0"
           />
         </div>
       </div>
@@ -130,12 +139,15 @@ function TokenListPanel() {
               const sel = token.id === selectedId;
               const cfg = categoryConfig[token.category];
               return (
-                <button
+                <Button
                   key={token.id}
+                  type="button"
+                  variant="ghost"
                   onClick={() => selectToken(token.id)}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
-                    sel ? "bg-[#EEEDFE]" : "hover:bg-muted"
-                  }`}
+                  className={cn(
+                    "h-auto w-full justify-start gap-2 rounded-lg px-2 py-1.5 text-left font-normal",
+                    sel ? "bg-[#EEEDFE] hover:bg-[#EEEDFE]" : "hover:bg-muted",
+                  )}
                 >
                   <div
                     className="h-2 w-2 shrink-0 rounded-full"
@@ -144,9 +156,10 @@ function TokenListPanel() {
                     }}
                   />
                   <span
-                    className={`flex-1 truncate text-xs font-medium ${
-                      sel ? "text-[#3C3489]" : "text-foreground"
-                    }`}
+                    className={cn(
+                      "flex-1 truncate text-xs font-medium",
+                      sel ? "text-[#3C3489]" : "text-foreground",
+                    )}
                   >
                     {token.name || "untitled"}
                   </span>
@@ -155,7 +168,7 @@ function TokenListPanel() {
                       ? `stiff: ${token.springStiffness}`
                       : `${token.durationMs}ms`}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -163,13 +176,15 @@ function TokenListPanel() {
       </nav>
 
       <div className="border-t border-border p-3">
-        <button
+        <Button
+          type="button"
+          variant="ghost"
           onClick={createToken}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+          className="flex h-auto w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs font-normal text-muted-foreground hover:border-primary/40 hover:bg-transparent hover:text-foreground"
         >
           <Plus className="h-3.5 w-3.5" />
           New token
-        </button>
+        </Button>
       </div>
     </aside>
   );
@@ -215,26 +230,31 @@ function PreviewPanel() {
       <div className="px-8 pb-5">
         <div className="flex items-center gap-2">
           {PREVIEW_TABS.map((tab) => (
-            <button
+            <Button
               key={tab.key}
+              type="button"
+              variant="ghost"
               onClick={() => setPreviewComponent(tab.key)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+              className={cn(
+                "h-auto rounded-lg px-3 py-1.5 text-xs font-medium",
                 previewComponent === tab.key
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-[#888780] hover:text-foreground"
-              }`}
+                  ? "bg-white text-foreground shadow-sm hover:bg-white"
+                  : "text-[#888780] hover:bg-transparent hover:text-foreground",
+              )}
             >
               {tab.label}
-            </button>
+            </Button>
           ))}
           <div className="flex-1" />
-          <button
+          <Button
+            type="button"
+            variant="ghost"
             onClick={replay}
-            className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition hover:bg-gray-50"
+            className="h-auto gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-foreground shadow-sm hover:bg-gray-50"
           >
             <Play className="h-3 w-3" />
             Replay
-          </button>
+          </Button>
         </div>
 
         <div className="mt-4 flex flex-col gap-2">
@@ -268,9 +288,12 @@ function PreviewComponent({ type }: { type: PreviewComponent }) {
   switch (type) {
     case "button":
       return (
-        <button className="rounded-lg bg-[#534AB7] px-6 py-2.5 text-sm font-medium text-white shadow-sm">
+        <Button
+          type="button"
+          className="h-auto rounded-lg bg-[#534AB7] px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#534AB7]"
+        >
           Get started
-        </button>
+        </Button>
       );
     case "card":
       return (
@@ -379,15 +402,16 @@ function PropertiesPanel() {
         <div className="mb-4">
           <label className="mb-1 block text-[10px] text-[#888780]">Name</label>
           <div className="relative">
-            <input
+            <Input
               ref={nameInputRef}
               value={token.name}
               onChange={(e) => update({ name: e.target.value })}
               onBlur={handleBlur}
               placeholder="enter.default"
-              className={`w-full rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs text-foreground outline-none transition focus:ring-2 focus:ring-ring ${
-                nameConflict ? "border-red-400" : "border-border"
-              }`}
+              className={cn(
+                "h-auto rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs focus-visible:ring-2 focus-visible:ring-ring",
+                nameConflict ? "border-red-400" : "border-border",
+              )}
             />
             {token.name.trim() && !nameConflict && (
               <Check className="absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-green-500" />
@@ -404,38 +428,45 @@ function PropertiesPanel() {
           <label className="mb-1 block text-[10px] text-[#888780]">
             Category
           </label>
-          <select
+          <Select
             value={token.category}
-            onChange={(e) =>
-              update({ category: e.target.value as MotionTokenCategory })
+            onValueChange={(v) =>
+              update({ category: v as MotionTokenCategory })
             }
-            onBlur={handleBlur}
-            className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:ring-2 focus:ring-ring"
           >
-            {motionCategories.map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="h-auto w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-normal shadow-none focus:ring-2 focus:ring-ring">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {motionCategories.map((c) => (
+                <SelectItem key={c.key} value={c.key}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="mb-5 flex items-center justify-between">
           <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[#888780]">
             {token.isSpring ? "Spring physics" : "Timing"}
           </span>
-          <button
+          <Button
+            type="button"
+            variant="ghost"
             onClick={() => update({ isSpring: !token.isSpring })}
-            className={`relative h-[18px] w-8 rounded-full transition ${
-              token.isSpring ? "bg-primary" : "bg-muted"
-            }`}
+            className={cn(
+              "relative h-[18px] w-8 shrink-0 rounded-full p-0 hover:bg-transparent",
+              token.isSpring ? "bg-primary" : "bg-muted",
+            )}
           >
-            <div
-              className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
-                token.isSpring ? "translate-x-[14px]" : "translate-x-0.5"
-              }`}
+            <span
+              className={cn(
+                "absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform",
+                token.isSpring ? "translate-x-[14px]" : "translate-x-0.5",
+              )}
             />
-          </button>
+          </Button>
         </div>
 
         {token.isSpring ? (
@@ -532,27 +563,30 @@ function PropertiesPanel() {
             </p>
             <div className="grid grid-cols-2 gap-1.5">
               {EASING_PRESETS.map((preset) => (
-                <button
+                <Button
                   key={preset}
+                  type="button"
+                  variant="ghost"
                   onClick={() => update({ easing: preset })}
-                  className={`rounded-lg px-2 py-1.5 text-[11px] font-medium transition ${
+                  className={cn(
+                    "h-auto rounded-lg px-2 py-1.5 text-[11px] font-medium",
                     token.easing === preset
-                      ? "bg-[#EEEDFE] text-[#3C3489]"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
+                      ? "bg-[#EEEDFE] text-[#3C3489] hover:bg-[#EEEDFE]"
+                      : "bg-muted text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
                 >
                   {preset}
-                </button>
+                </Button>
               ))}
             </div>
-            <input
+            <Input
               value={
                 token.easing.startsWith("cubic-bezier") ? token.easing : ""
               }
               onChange={(e) => update({ easing: e.target.value })}
               onBlur={handleBlur}
               placeholder="cubic-bezier(0.4, 0, 0.2, 1)"
-              className="mt-2 w-full rounded-lg border border-border bg-background px-2.5 py-1.5 font-mono text-[10px] text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
+              className="mt-2 h-auto rounded-lg border border-border bg-background px-2.5 py-1.5 font-mono text-[10px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
         )}
@@ -561,19 +595,22 @@ function PropertiesPanel() {
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#888780]">
             Generated code
           </p>
-          <div className="mb-2 flex gap-1">
+          <div className="mb-2 flex flex-wrap gap-1">
             {CODE_TABS.map((tab) => (
-              <button
+              <Button
                 key={tab.key}
+                type="button"
+                variant="ghost"
                 onClick={() => setCodeFormat(tab.key)}
-                className={`rounded px-2 py-1 text-[10px] font-medium transition ${
+                className={cn(
+                  "h-auto rounded px-2 py-1 text-[10px] font-medium",
                   codeFormat === tab.key
-                    ? "bg-[#EEEDFE] text-[#3C3489]"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                    ? "bg-[#EEEDFE] text-[#3C3489] hover:bg-[#EEEDFE]"
+                    : "text-muted-foreground hover:bg-transparent hover:text-foreground",
+                )}
               >
                 {tab.label}
-              </button>
+              </Button>
             ))}
           </div>
           <pre className="max-h-[200px] overflow-auto rounded-lg bg-background p-3 font-mono text-[11px] leading-relaxed text-foreground">
@@ -583,9 +620,11 @@ function PropertiesPanel() {
       </div>
 
       <div className="border-t border-border p-4">
-        <button
+        <Button
+          type="button"
+          variant="ghost"
           onClick={handleCopy}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 text-xs font-medium text-foreground transition hover:bg-muted"
+          className="flex h-auto w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 text-xs font-medium text-foreground hover:bg-muted"
         >
           {copied ? (
             <>
@@ -598,7 +637,7 @@ function PropertiesPanel() {
               Copy code
             </>
           )}
-        </button>
+        </Button>
       </div>
     </aside>
   );

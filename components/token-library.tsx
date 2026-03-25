@@ -8,6 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   categoryConfig,
   categoryOrder,
@@ -302,24 +310,28 @@ export function TokenLibrary() {
                   />
                 </label>
 
-                <label className="block space-y-1">
-                  <span className="text-xs text-muted-foreground">Category</span>
-                  <select
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Category</Label>
+                  <Select
                     value={selectedToken.category}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       updateToken(selectedToken.id, {
-                        category: event.target.value as MotionTokenCategory,
+                        category: value as MotionTokenCategory,
                       })
                     }
-                    className="h-10 w-full rounded-xl border border-input bg-transparent px-3 text-sm outline-none"
                   >
-                    {motionCategories.map((category) => (
-                      <option key={category.key} value={category.key}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {motionCategories.map((category) => (
+                        <SelectItem key={category.key} value={category.key}>
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 {selectedToken.isSpring ? (
                   <>

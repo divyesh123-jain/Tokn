@@ -249,6 +249,14 @@ packages/
 - `GET /workspaces/:id/sdk/:version`
 - `POST /workspaces/:id/previews`
 
+## Web dashboard UI (implementation)
+
+The Tokn app is built with **shadcn/ui** for product chrome: buttons, inputs, selects, tabs, dialogs, sheets, popovers, and toasts (Sonner). That stack is how we ship the dashboard — not a customer-facing “shadcn feature” inside the motion product. Token authoring, SDK output, and enforcement stay framework-agnostic.
+
+### Phase 2 (roadmap): shadcn animation preset pack
+
+Ship curated **Tokn token sets** tuned for shadcn/Radix surfaces: overlay fade and content motion for `Dialog`, slide + backdrop pairing for `Sheet`, anchor-aware enter/exit for `Popover`, and stack/lifetime defaults for `Toast` / Sonner. Teams on shadcn import a named preset (or generate CSS variables + Framer snippets) so motion matches component semantics without hand-mapping durations and easings per screen.
+
 ## Success Metrics
 
 - Token adoption rate (`tokenized animations / total animations`)
