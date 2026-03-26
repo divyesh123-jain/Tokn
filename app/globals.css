@@ -154,6 +154,106 @@ input[type="range"]::-moz-range-thumb {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+html[data-accent="purple"] {
+  --primary: #534ab7;
+  --accent: #eeedfe;
+  --accent-foreground: #534ab7;
+  --ring: #534ab7;
+  --secondary: #f5f4fe;
+  --secondary-foreground: #1a1a2e;
+  --sidebar-primary: #534ab7;
+  --sidebar-accent: #eeedfe;
+  --sidebar-accent-foreground: #534ab7;
+  --sidebar-ring: #534ab7;
+}
+
+html.dark[data-accent="purple"] {
+  --primary: #8c7bff;
+  --accent: #3c3489;
+  --accent-foreground: #f8f8f6;
+  --ring: #8c7bff;
+  --secondary: #3c3489;
+  --sidebar-primary: #8c7bff;
+  --sidebar-accent: #3c3489;
+  --sidebar-accent-foreground: #f8f8f6;
+  --sidebar-ring: #8c7bff;
+}
+
+html[data-accent="coral"] {
+  --primary: #e07b6c;
+  --accent: #fce9e6;
+  --accent-foreground: #e07b6c;
+  --ring: #e07b6c;
+  --secondary: #fce9e6;
+  --secondary-foreground: #1a1a2e;
+  --sidebar-primary: #e07b6c;
+  --sidebar-accent: #fce9e6;
+  --sidebar-accent-foreground: #e07b6c;
+  --sidebar-ring: #e07b6c;
+}
+
+html.dark[data-accent="coral"] {
+  --primary: #ff9e8d;
+  --accent: #8f3530;
+  --accent-foreground: #f8f8f6;
+  --ring: #ff9e8d;
+  --secondary: #8f3530;
+  --sidebar-primary: #ff9e8d;
+  --sidebar-accent: #8f3530;
+  --sidebar-accent-foreground: #f8f8f6;
+  --sidebar-ring: #ff9e8d;
+}
+
+html[data-accent="teal"] {
+  --primary: #3ba89e;
+  --accent: #e5f5f3;
+  --accent-foreground: #3ba89e;
+  --ring: #3ba89e;
+  --secondary: #e5f5f3;
+  --secondary-foreground: #1a1a2e;
+  --sidebar-primary: #3ba89e;
+  --sidebar-accent: #e5f5f3;
+  --sidebar-accent-foreground: #3ba89e;
+  --sidebar-ring: #3ba89e;
+}
+
+html.dark[data-accent="teal"] {
+  --primary: #68e1d4;
+  --accent: #137064;
+  --accent-foreground: #f8f8f6;
+  --ring: #68e1d4;
+  --secondary: #137064;
+  --sidebar-primary: #68e1d4;
+  --sidebar-accent: #137064;
+  --sidebar-accent-foreground: #f8f8f6;
+  --sidebar-ring: #68e1d4;
+}
+
+html[data-accent="amber"] {
+  --primary: #d4993d;
+  --accent: #fdf3e4;
+  --accent-foreground: #d4993d;
+  --ring: #d4993d;
+  --secondary: #fdf3e4;
+  --secondary-foreground: #1a1a2e;
+  --sidebar-primary: #d4993d;
+  --sidebar-accent: #fdf3e4;
+  --sidebar-accent-foreground: #d4993d;
+  --sidebar-ring: #d4993d;
+}
+
+html.dark[data-accent="amber"] {
+  --primary: #ffc46f;
+  --accent: #7a4b12;
+  --accent-foreground: #f8f8f6;
+  --ring: #ffc46f;
+  --secondary: #7a4b12;
+  --sidebar-primary: #ffc46f;
+  --sidebar-accent: #7a4b12;
+  --sidebar-accent-foreground: #f8f8f6;
+  --sidebar-ring: #ffc46f;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

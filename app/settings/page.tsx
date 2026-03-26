@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { ThemePicker } from "@/components/theme-picker";
 
 const settingsBlocks = [
   {
@@ -54,6 +55,17 @@ export default function SettingsPage() {
             </ul>
           </section>
         ))}
+
+        <section className="rounded-xl border border-border bg-muted p-5 md:col-span-3">
+          <h3 className="text-lg font-semibold text-foreground">Appearance</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Pick your accent palette and light/dark mode preference.
+          </p>
+
+          <div className="mt-4 flex items-center gap-4">
+            <ThemePicker />
+          </div>
+        </section>
       </div>
     </AppShell>
   );

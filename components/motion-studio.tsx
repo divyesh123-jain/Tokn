@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Copy, MoreHorizontal, Pencil, Play, Plus, Search, Trash2 } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThemePicker } from "@/components/theme-picker";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -85,10 +87,43 @@ const CODE_TABS: { key: CodeFormat; label: string }[] = [
 
 export function MotionStudio() {
   return (
-    <div className="flex h-screen">
-      <TokenListPanel />
-      <PreviewPanel />
-      <PropertiesPanel />
+    <div className="relative h-screen overflow-hidden">
+      <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2">
+        <nav className="flex items-center gap-2 overflow-x-auto rounded-xl border border-border bg-card/70 px-2 py-1.5 backdrop-blur">
+          <Link
+            href="/tokens"
+            className="rounded-lg border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+          >
+            Tokens
+          </Link>
+          <Link
+            href="/preview"
+            className="rounded-lg border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+          >
+            Preview Lab
+          </Link>
+          <Link
+            href="/releases"
+            className="rounded-lg border border-border bg-muted/30 px-2 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+          >
+            Releases
+          </Link>
+          <Link
+            href="/settings"
+            className="rounded-lg bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition hover:bg-primary/90"
+          >
+            Profile
+          </Link>
+        </nav>
+
+        <ThemePicker variant="compact" />
+      </div>
+
+      <div className="flex h-full">
+        <TokenListPanel />
+        <PreviewPanel />
+        <PropertiesPanel />
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { motionTokens } from "@/db/schema";
 import { motionTokenDbRowToItem, motionTokenItemToDbFields } from "@/lib/token-db";
+import type { MotionTokenDbRow } from "@/lib/token-db";
 
 const tokenCategorySchema = z.enum(["enter", "exit", "spring", "feedback"]);
 
@@ -157,7 +158,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Token not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ token: motionTokenDbRowToItem(updated[0] as any) });
+    return NextResponse.json({ token: motionTokenDbRowToItem(updated[0] as MotionTokenDbRow) });
   }
 
   const deleted = await db
@@ -169,6 +170,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Token not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ token: motionTokenDbRowToItem(deleted[0] as any) });
+  return NextResponse.json({ token: motionTokenDbRowToItem(deleted[0] as MotionTokenDbRow) });
 }
 
