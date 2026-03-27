@@ -88,7 +88,7 @@ const CODE_TABS: { key: CodeFormat; label: string }[] = [
 export function MotionStudio() {
   return (
     <div className="relative h-screen overflow-hidden">
-      <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2">
+      {/* <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2">
         <nav className="flex items-center gap-2 overflow-x-auto rounded-xl border border-border bg-card/70 px-2 py-1.5 backdrop-blur">
           <Link
             href="/tokens"
@@ -117,7 +117,7 @@ export function MotionStudio() {
         </nav>
 
         <ThemePicker variant="compact" />
-      </div>
+      </div> */}
 
       <div className="flex h-full">
         <TokenListPanel />

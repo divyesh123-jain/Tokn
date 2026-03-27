@@ -40,7 +40,6 @@ export const ToknHero: FC = () => {
         <a href="#how" className="btn-outline-lg">
           See how it works
         </a>
-        <span className="hero-cta-note">Free forever for solo - No credit card</span>
       </div>
 
       <div className="hero-visual">

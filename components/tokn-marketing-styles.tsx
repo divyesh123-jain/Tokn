@@ -198,17 +198,61 @@ nav {
 .section-sub { font-size: 17px; color: var(--gray-600); max-width: 560px; line-height: 1.65; }
 
 .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 48px; }
-.ba-card { border-radius: 14px; padding: 28px; }
-.ba-card.before { background: var(--coral-l); border: 0.5px solid #F0997B; }
-.ba-card.after  { background: var(--teal-l);  border: 0.5px solid var(--teal-m); }
-.ba-title { font-size: 13px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
-.ba-card.before .ba-title { color: var(--coral); }
-.ba-card.after  .ba-title { color: var(--teal); }
-.ba-item { font-size: 13px; line-height: 1.7; padding: 6px 0; border-bottom: 0.5px solid rgba(0,0,0,0.06); display: flex; align-items: flex-start; gap: 8px; }
+.ba-card {
+  border-radius: 14px;
+  padding: 24px;
+  border: 0.5px solid var(--gray-200);
+  background: var(--white);
+  transition: border-color .2s, transform .15s;
+}
+.ba-card:hover { transform: translateY(-2px); }
+.ba-card.before:hover { border-color: #F0997B; }
+.ba-card.after:hover { border-color: var(--teal-m); }
+.ba-title { margin-bottom: 14px; }
+.ba-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.ba-chip-before {
+  color: var(--coral);
+  background: var(--coral-l);
+  border: 0.5px solid #F0997B;
+}
+.ba-chip-after {
+  color: var(--teal);
+  background: var(--teal-l);
+  border: 0.5px solid var(--teal-m);
+}
+.ba-item {
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--gray-100);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--gray-600);
+}
 .ba-item:last-child { border-bottom: none; }
-.ba-icon { font-size: 12px; margin-top: 2px; flex-shrink: 0; }
-.ba-card.before .ba-item { color: #712B13; }
-.ba-card.after  .ba-item { color: var(--teal); }
+.ba-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+.ba-icon-before { color: var(--coral); background: var(--coral-l); }
+.ba-icon-after { color: var(--teal); background: var(--teal-l); }
 
 .hiw-bg { background: var(--gray-50); border-top: 0.5px solid var(--gray-200); border-bottom: 0.5px solid var(--gray-200); }
 .steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; margin-top: 48px; }

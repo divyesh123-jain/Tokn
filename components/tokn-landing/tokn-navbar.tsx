@@ -10,7 +10,7 @@ export const ToknNavbar: FC = () => {
       <div className="nav-links">
         <a href="#how">How it works</a>
         <a href="#features">Features</a>
-        <a href="#pricing">Pricing</a>
+        {/* <a href="#pricing">Pricing</a> */}
         <a href="/tokens">Docs</a>
       </div>
       <div className="nav-right">
