@@ -35,11 +35,15 @@ export async function POST(req: Request) {
 
   const userEmail = data.user?.email;
   if (userEmail) {
-    const pg = getDb();
-    const now = new Date();
-    const existingUsers = await pg.select().from(users).where(eq(users.email, userEmail));
-    if (existingUsers.length === 0) {
-      await pg.insert(users).values({ email: userEmail, createdAt: now });
+    try {
+      const pg = getDb();
+      const now = new Date();
+      const existingUsers = await pg.select().from(users).where(eq(users.email, userEmail));
+      if (existingUsers.length === 0) {
+        await pg.insert(users).values({ email: userEmail, createdAt: now });
+      }
+    } catch (e) {
+      console.error("Postgres user upsert failed (non-blocking)", e);
     }
   }
 
