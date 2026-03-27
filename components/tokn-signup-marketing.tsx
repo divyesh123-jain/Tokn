@@ -27,7 +27,18 @@ function GoogleIcon() {
   );
 }
 
-export function ToknSignUpMarketing() {
+type ToknSignUpMarketingProps = {
+  name: string;
+  email: string;
+  password: string;
+  onNameChange: (v: string) => void;
+  onEmailChange: (v: string) => void;
+  onPasswordChange: (v: string) => void;
+  onSubmit: () => void;
+  isSubmitting?: boolean;
+};
+
+export function ToknSignUpMarketing(props: ToknSignUpMarketingProps) {
   return (
     <>
       <ToknMarketingStyles />
@@ -78,14 +89,21 @@ export function ToknSignUpMarketing() {
             Tokenize motion, preview the feel, then ship consistent UX with guardrails.
           </p>
 
-          <form className="auth-form" action="/dashboard" method="get">
+          <form
+            className="auth-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              props.onSubmit();
+            }}
+          >
             <div className="auth-field">
               <label htmlFor="full-name">Full name</label>
               <input
                 id="full-name"
                 className="auth-input"
                 type="text"
-                name="name"
+                value={props.name}
+                onChange={(e) => props.onNameChange(e.target.value)}
                 placeholder="Julian Drake"
                 required
               />
@@ -97,9 +115,11 @@ export function ToknSignUpMarketing() {
                 id="email"
                 className="auth-input"
                 type="email"
-                name="email"
+                value={props.email}
+                onChange={(e) => props.onEmailChange(e.target.value)}
                 placeholder="julian@kinetic.io"
                 required
+                autoComplete="email"
               />
             </div>
 
@@ -109,9 +129,11 @@ export function ToknSignUpMarketing() {
                 id="password"
                 className="auth-input"
                 type="password"
-                name="password"
+                value={props.password}
+                onChange={(e) => props.onPasswordChange(e.target.value)}
                 placeholder="•••••••"
                 required
+                autoComplete="new-password"
               />
             </div>
 
@@ -119,8 +141,9 @@ export function ToknSignUpMarketing() {
               className="btn-primary-lg auth-submit"
               style={{ width: "100%", justifyContent: "center" }}
               type="submit"
+              disabled={props.isSubmitting}
             >
-              Create account
+              {props.isSubmitting ? "Creating..." : "Create account"}
             </button>
           </form>
 

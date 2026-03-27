@@ -22,7 +22,7 @@ export function ToknLandingPage() {
         <ToknHowItWorks />
         <ToknFeatures />
         <ToknMcpSection />
-        <ToknSocialProof />
+        {/* <ToknSocialProof /> */}
         {/* <ToknPricing /> */}
         <ToknFinalCta />
         <ToknFooter />
