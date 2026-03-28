@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { motionTokens, workspaces } from "@/db/schema";
+import { getSessionUser, getWorkspaceMemberRole } from "@/lib/auth-helpers";
 import { motionTokenItemToDbFields, motionTokenDbRowToItem } from "@/lib/token-db";
 
 const tokenCategorySchema = z.enum(["enter", "exit", "spring", "feedback"]);
@@ -30,6 +31,11 @@ export async function GET(
   req: NextRequest,
   context: { params: Promise<{ workspaceId: string }> },
 ) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { workspaceId: workspaceIdRaw } = await context.params;
   const db = getDb();
   const parsedWorkspaceId = uuidParam.safeParse(workspaceIdRaw);
@@ -37,10 +43,16 @@ export async function GET(
     return NextResponse.json({ error: "Invalid workspaceId" }, { status: 400 });
   }
 
+  const workspaceId = parsedWorkspaceId.data;
+  const role = await getWorkspaceMemberRole(user.userId, workspaceId);
+  if (!role) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const rows = await db
     .select()
     .from(motionTokens)
-    .where(eq(motionTokens.workspaceId, parsedWorkspaceId.data));
+    .where(eq(motionTokens.workspaceId, workspaceId));
 
   const tokens = rows.map((r) =>
     motionTokenDbRowToItem(r as unknown as { workspaceId: string; id: string } & typeof r),
@@ -53,6 +65,11 @@ export async function POST(
   req: NextRequest,
   context: { params: Promise<{ workspaceId: string }> },
 ) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { workspaceId: workspaceIdRaw } = await context.params;
   const db = getDb();
   const parsedWorkspaceId = uuidParam.safeParse(workspaceIdRaw);
@@ -61,6 +78,11 @@ export async function POST(
   }
 
   const workspaceId = parsedWorkspaceId.data;
+
+  const memberRole = await getWorkspaceMemberRole(user.userId, workspaceId);
+  if (!memberRole) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const workspaceRows = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId));
   if (workspaceRows.length === 0) {

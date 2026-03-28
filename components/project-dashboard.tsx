@@ -3,44 +3,72 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Share2 } from "lucide-react";
+import { ArrowLeft, Loader2, Share2 } from "lucide-react";
 
 import { MotionStudio } from "@/components/motion-studio";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ThemePicker } from "@/components/theme-picker";
+import { leaveWorkspaceSession, useTokenStore } from "@/lib/token-store";
+import type { MotionTokenItem } from "@/lib/motif";
+import { scheduleRouterAction } from "@/lib/safe-router";
 import { cn } from "@/lib/utils";
-import { useProjectStore } from "@/lib/project-store";
+import type { WorkspaceSummary } from "@/lib/workspace-types";
 
 export function ProjectDashboard({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const [hydrated, setHydrated] = React.useState(false);
+  const [workspace, setWorkspace] = React.useState<WorkspaceSummary | null>(null);
+  const tokensHydrating = useTokenStore((s) => s.tokensHydrating);
 
   React.useEffect(() => {
-    const done = () => setHydrated(true);
-    if (useProjectStore.persist.hasHydrated()) {
-      done();
-      return;
+    let cancelled = false;
+    async function run() {
+      useTokenStore.setState({
+        workspaceId: projectId,
+        tokensHydrating: true,
+        tokens: [],
+        selectedId: null,
+      });
+      const [wRes, tRes] = await Promise.all([
+        fetch(`/api/workspaces/${projectId}`),
+        fetch(`/api/workspaces/${projectId}/tokens`),
+      ]);
+      if (cancelled) return;
+      if (wRes.status === 401 || tRes.status === 401) {
+        scheduleRouterAction(() => router.push("/signin"));
+        return;
+      }
+      if (wRes.status === 404) {
+        scheduleRouterAction(() => router.replace("/projects"));
+        return;
+      }
+      if (tRes.status === 403 || tRes.status === 404) {
+        scheduleRouterAction(() => router.replace("/projects"));
+        return;
+      }
+      const wJson = (await wRes.json()) as { workspace?: WorkspaceSummary };
+      const tJson = (await tRes.json()) as { tokens: MotionTokenItem[] };
+      if (!wJson.workspace) {
+        scheduleRouterAction(() => router.replace("/projects"));
+        return;
+      }
+      const ws = wJson.workspace;
+      useTokenStore.getState().replaceTokens(tJson.tokens, tJson.tokens[0]?.id ?? null);
+      setWorkspace(ws);
     }
-    return useProjectStore.persist.onFinishHydration(done);
-  }, []);
+    void run();
+    return () => {
+      cancelled = true;
+      void leaveWorkspaceSession(projectId);
+    };
+  }, [projectId, router]);
 
-  const project = useProjectStore((s) => s.projects.find((p) => p.id === projectId));
-
-  React.useEffect(() => {
-    if (!hydrated) return;
-    if (!project) router.replace("/projects");
-  }, [hydrated, project, router]);
-
-  if (!hydrated) {
+  if (!workspace || tokensHydrating) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-        Loading…
+      <div className="flex h-screen flex-col items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" />
+        <span>Loading project…</span>
       </div>
     );
-  }
-
-  if (!project) {
-    return null;
   }
 
   return (
@@ -55,9 +83,9 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
             Projects
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="truncate text-sm font-semibold">{project.name}</span>
+          <span className="truncate text-sm font-semibold">{workspace.name}</span>
           <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent-foreground">
-            {project.kind === "team" ? "Team" : "Individual"}
+            {workspace.kind === "team" ? "Team" : "Individual"}
           </span>
         </div>
         <div className="flex items-center gap-2">

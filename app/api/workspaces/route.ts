@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
-import { motionTokens, users, workspaceMembers, workspaces } from "@/db/schema";
+import { motionTokens, workspaceMembers, workspaces } from "@/db/schema";
+import { getSessionUser } from "@/lib/auth-helpers";
 import { initialMotionTokens } from "@/lib/motif";
-import { motionTokenItemToDbFields, motionTokenDbRowToItem } from "@/lib/token-db";
+import { motionTokenItemToDbFields } from "@/lib/token-db";
 
 const DEFAULT_TOKEN_NAMES = [
   "enter.fast",
@@ -19,39 +20,66 @@ const DEFAULT_TOKEN_NAMES = [
 ];
 
 const createWorkspaceSchema = z.object({
-  ownerEmail: z.string().email(),
-  workspaceName: z.string().min(1).max(200),
+  name: z.string().min(1).max(200),
+  kind: z.enum(["individual", "team"]),
 });
 
-export async function POST(req: Request) {
+export async function GET() {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const db = getDb();
+  const rows = await db
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      kind: workspaces.kind,
+      createdAt: workspaces.createdAt,
+      role: workspaceMembers.role,
+    })
+    .from(workspaces)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+    .where(eq(workspaceMembers.userId, user.userId))
+    .orderBy(desc(workspaces.createdAt));
+
+  return NextResponse.json({
+    workspaces: rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind,
+      createdAt: r.createdAt.toISOString(),
+      role: r.role,
+    })),
+  });
+}
+
+export async function POST(req: Request) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const parsed = createWorkspaceSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const { ownerEmail, workspaceName } = parsed.data;
+  const { name, kind } = parsed.data;
+  const db = getDb();
   const now = new Date();
-
-  const existingUsers = await db.select().from(users).where(eq(users.email, ownerEmail));
-  let userId: string;
-  if (existingUsers.length === 0) {
-    const insertedUsers = await db.insert(users).values({ email: ownerEmail, createdAt: now }).returning();
-    userId = insertedUsers[0].id;
-  } else {
-    userId = existingUsers[0].id;
-  }
 
   const insertedWorkspaces = await db
     .insert(workspaces)
-    .values({ name: workspaceName, createdAt: now })
+    .values({ name, kind, createdAt: now })
     .returning();
 
   const workspaceId = insertedWorkspaces[0].id;
 
   await db.insert(workspaceMembers).values({
     workspaceId,
-    userId,
+    userId: user.userId,
     role: "owner",
     createdAt: now,
   });
@@ -69,15 +97,13 @@ export async function POST(req: Request) {
 
   await db.insert(motionTokens).values(tokenRows);
 
-  const tokenListRows = await db
-    .select()
-    .from(motionTokens)
-    .where(eq(motionTokens.workspaceId, workspaceId));
-
-  const tokens = tokenListRows.map((r) =>
-    motionTokenDbRowToItem(r as unknown as { workspaceId: string; id: string } & typeof r),
-  );
-
-  return NextResponse.json({ workspaceId, userId, tokens });
+  return NextResponse.json({
+    workspace: {
+      id: workspaceId,
+      name,
+      kind,
+      createdAt: now.toISOString(),
+      role: "owner",
+    },
+  });
 }
-

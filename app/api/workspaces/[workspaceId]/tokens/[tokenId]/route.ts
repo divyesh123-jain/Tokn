@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { motionTokens } from "@/db/schema";
+import { getSessionUser, getWorkspaceMemberRole } from "@/lib/auth-helpers";
 import { motionTokenDbRowToItem, motionTokenItemToDbFields } from "@/lib/token-db";
 import type { MotionTokenDbRow } from "@/lib/token-db";
 
@@ -31,6 +32,11 @@ export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ workspaceId: string; tokenId: string }> },
 ) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { workspaceId: workspaceIdRaw, tokenId: tokenIdRaw } = await context.params;
   const db = getDb();
   const parsedWorkspaceId = uuidParam.safeParse(workspaceIdRaw);
@@ -41,6 +47,11 @@ export async function PATCH(
 
   const workspaceId = parsedWorkspaceId.data;
   const tokenId = parsedTokenId.data;
+
+  const memberRole = await getWorkspaceMemberRole(user.userId, workspaceId);
+  if (!memberRole) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const payload = tokenPatchSchema.safeParse(await req.json());
   if (!payload.success) {
@@ -131,6 +142,11 @@ export async function DELETE(
   req: NextRequest,
   context: { params: Promise<{ workspaceId: string; tokenId: string }> },
 ) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { workspaceId: workspaceIdRaw, tokenId: tokenIdRaw } = await context.params;
   const db = getDb();
   const parsedWorkspaceId = uuidParam.safeParse(workspaceIdRaw);
@@ -141,6 +157,11 @@ export async function DELETE(
 
   const workspaceId = parsedWorkspaceId.data;
   const tokenId = parsedTokenId.data;
+
+  const memberRole = await getWorkspaceMemberRole(user.userId, workspaceId);
+  if (!memberRole) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const soft = typeof body?.soft === "boolean" ? body.soft : true;

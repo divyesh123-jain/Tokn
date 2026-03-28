@@ -199,9 +199,9 @@ function TokenListPanel() {
 
   function confirmDelete(tokenId: string) {
     if (hasPublishedUsage(tokenId)) {
-      softDeleteToken(tokenId);
+      void softDeleteToken(tokenId);
     } else {
-      deleteToken(tokenId);
+      void deleteToken(tokenId);
     }
     setDeleteConfirmId(null);
   }
@@ -317,7 +317,7 @@ function TokenListPanel() {
                       />
                       <DropdownMenuContent align="end" sideOffset={6} className="w-40">
                         <DropdownMenuItem
-                          onClick={() => duplicateToken(token.id)}
+                          onClick={() => void duplicateToken(token.id)}
                           className="text-xs"
                         >
                           <Copy className="h-3.5 w-3.5" />
@@ -377,7 +377,7 @@ function TokenListPanel() {
         <Button
           type="button"
           variant="ghost"
-          onClick={createToken}
+          onClick={() => void createToken()}
           className="flex h-auto w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs font-normal text-muted-foreground hover:border-primary/40 hover:bg-transparent hover:text-foreground"
         >
           <Plus className="h-3.5 w-3.5" />
@@ -622,7 +622,7 @@ function PropertiesPanel() {
               variant="ghost"
               size="icon"
               title="Duplicate this token."
-              onClick={() => duplicateToken(token.id)}
+              onClick={() => void duplicateToken(token.id)}
               className="h-6 w-6 rounded-md text-[#888780] hover:bg-muted"
             >
               <Copy className="h-3.5 w-3.5" />

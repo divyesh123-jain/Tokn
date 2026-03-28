@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   ChevronDown,
   Clock,
@@ -10,17 +11,25 @@ import {
   HelpCircle,
   Inbox,
   LayoutGrid,
+  Loader2,
   MoreHorizontal,
   Plus,
   Search,
   Settings,
   Share2,
   Sparkles,
+  Trash2,
   User,
   Users,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -29,8 +38,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { scheduleRouterAction } from "@/lib/safe-router";
 import { cn } from "@/lib/utils";
-import { type ProjectKind, type ToknProject, useProjectStore } from "@/lib/project-store";
+import { useUiPrefs } from "@/lib/ui-prefs";
+import type { WorkspaceKind, WorkspaceSummary } from "@/lib/workspace-types";
 
 const NAV = [
   { key: "all", label: "All projects", icon: LayoutGrid },
@@ -49,29 +60,110 @@ function initialsFromLabel(label: string) {
 
 export function ProjectsHome() {
   const router = useRouter();
-  const projects = useProjectStore((s) => s.projects);
-  const workspaceLabel = useProjectStore((s) => s.workspaceLabel);
-  const setWorkspaceLabel = useProjectStore((s) => s.setWorkspaceLabel);
-  const addProject = useProjectStore((s) => s.addProject);
+  const workspaceLabel = useUiPrefs((s) => s.workspaceLabel);
+  const setWorkspaceLabel = useUiPrefs((s) => s.setWorkspaceLabel);
 
+  const [workspaces, setWorkspaces] = React.useState<WorkspaceSummary[]>([]);
+  const [listLoading, setListLoading] = React.useState(true);
   const [nav, setNav] = React.useState<(typeof NAV)[number]["key"]>("all");
   const [query, setQuery] = React.useState("");
   const [createOpen, setCreateOpen] = React.useState(false);
   const [newName, setNewName] = React.useState("");
-  const [kind, setKind] = React.useState<ProjectKind>("individual");
+  const [kind, setKind] = React.useState<WorkspaceKind>("individual");
+  const [creating, setCreating] = React.useState(false);
+
+  const refresh = React.useCallback(async () => {
+    const res = await fetch("/api/workspaces");
+    if (res.status === 401) {
+      scheduleRouterAction(() => router.push("/signin"));
+      return;
+    }
+    if (!res.ok) {
+      toast.error("Could not load projects");
+      return;
+    }
+    const data = (await res.json()) as { workspaces: WorkspaceSummary[] };
+    setWorkspaces(data.workspaces ?? []);
+  }, [router]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setListLoading(true);
+      await refresh();
+      if (!cancelled) setListLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refresh]);
 
   const filtered = React.useMemo(() => {
+    let list = workspaces;
+    if (nav === "teams") {
+      list = list.filter((w) => w.kind === "team");
+    }
+    if (nav === "recents") {
+      list = [...list].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    }
+    if (nav === "community" || nav === "drafts") {
+      list = [];
+    }
     const q = query.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => p.name.toLowerCase().includes(q));
-  }, [projects, query]);
+    if (!q) return list;
+    return list.filter((p) => p.name.toLowerCase().includes(q));
+  }, [workspaces, nav, query]);
 
-  function submitCreate() {
-    const p = addProject({ name: newName || "Untitled project", kind });
-    setCreateOpen(false);
-    setNewName("");
-    setKind("individual");
-    router.push(`/projects/${p.id}`);
+  async function submitCreate() {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: newName.trim() || "Untitled project",
+          kind,
+        }),
+      });
+      if (res.status === 401) {
+        scheduleRouterAction(() => router.push("/signin"));
+        return;
+      }
+      const json = (await res.json().catch(() => null)) as
+        | { workspace?: { id: string }; error?: string }
+        | null;
+      if (!res.ok || !json?.workspace) {
+        toast.error(json?.error ?? "Could not create project");
+        return;
+      }
+      const newId = json.workspace.id;
+      setCreateOpen(false);
+      setNewName("");
+      setKind("individual");
+      await refresh();
+      scheduleRouterAction(() => router.push(`/projects/${newId}`));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function deleteWorkspace(id: string) {
+    if (!window.confirm("Delete this project? This cannot be undone.")) return;
+    const res = await fetch(`/api/workspaces/${id}`, { method: "DELETE" });
+    if (res.status === 401) {
+      scheduleRouterAction(() => router.push("/signin"));
+      return;
+    }
+    if (!res.ok) {
+      const json = (await res.json().catch(() => null)) as { error?: string } | null;
+      toast.error(json?.error ?? "Could not delete project");
+      return;
+    }
+    toast.success("Project deleted");
+    await refresh();
   }
 
   return (
@@ -184,23 +276,33 @@ export function ProjectsHome() {
         </header>
 
         <div className="px-8 pb-12 pt-6">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filtered.map((p) => (
-              <ProjectCard
-                key={p.id}
-                project={p}
-                onOpen={() => router.push(`/projects/${p.id}`)}
-              />
-            ))}
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              className="flex min-h-[180px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/20 text-muted-foreground transition hover:border-primary/40 hover:bg-muted/40 hover:text-foreground"
-            >
-              <Plus className="mb-2 h-8 w-8 opacity-70" />
-              <span className="text-sm font-medium">Create new project</span>
-            </button>
-          </div>
+          {listLoading ? (
+            <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading projects…
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filtered.map((p) => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  onOpen={() =>
+                    scheduleRouterAction(() => router.push(`/projects/${p.id}`))
+                  }
+                  onDelete={() => void deleteWorkspace(p.id)}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="flex min-h-[180px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/20 text-muted-foreground transition hover:border-primary/40 hover:bg-muted/40 hover:text-foreground"
+              >
+                <Plus className="mb-2 h-8 w-8 opacity-70" />
+                <span className="text-sm font-medium">Create new project</span>
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
@@ -218,7 +320,7 @@ export function ProjectsHome() {
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Motion system"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") submitCreate();
+                  if (e.key === "Enter") void submitCreate();
                 }}
               />
             </div>
@@ -245,8 +347,15 @@ export function ProjectsHome() {
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
                 Cancel
               </Button>
-              <Button type="button" onClick={submitCreate}>
-                Create and open
+              <Button type="button" disabled={creating} onClick={() => void submitCreate()}>
+                {creating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating…
+                  </>
+                ) : (
+                  "Create and open"
+                )}
               </Button>
             </div>
           </div>
@@ -301,9 +410,11 @@ function TypeCard({
 function ProjectCard({
   project,
   onOpen,
+  onDelete,
 }: {
-  project: ToknProject;
+  project: WorkspaceSummary;
   onOpen: () => void;
+  onDelete: () => void;
 }) {
   const tone =
     project.kind === "team"
@@ -337,15 +448,33 @@ function ProjectCard({
             motion · library
           </div>
         </div>
-        <button
-          type="button"
-          className="relative z-10 rounded-md p-1 text-muted-foreground opacity-0 transition hover:bg-muted group-hover:opacity-100"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="relative z-10 h-8 w-8 text-muted-foreground opacity-0 transition hover:bg-muted group-hover:opacity-100"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete project
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

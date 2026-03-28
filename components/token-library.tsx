@@ -423,7 +423,7 @@ export function TokenLibrary() {
                   <Button
                     variant="outline"
                     className="w-full text-red-600"
-                    onClick={() => deleteToken(selectedToken.id)}
+                    onClick={() => void deleteToken(selectedToken.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     Delete token
