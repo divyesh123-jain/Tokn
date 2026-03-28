@@ -34,6 +34,7 @@ export function motionTokenDbRowToItem(
 ): MotionTokenItem {
   return {
     id: row.id,
+    pendingSync: false,
     name: row.name,
     category: row.category as MotionTokenItem["category"],
     durationMs: row.durationMs,
@@ -52,7 +53,7 @@ export function motionTokenDbRowToItem(
 }
 
 export function motionTokenItemToDbFields(
-  item: Omit<MotionTokenItem, "id">,
+  item: Omit<MotionTokenItem, "id" | "pendingSync" | "updatedAt">,
 ): Omit<MotionTokenDbRow, "id" | "workspaceId"> {
   return {
     name: item.name,

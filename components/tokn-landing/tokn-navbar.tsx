@@ -1,6 +1,10 @@
 import type { FC } from "react";
 
-export const ToknNavbar: FC = () => {
+type ToknNavbarProps = {
+  signedIn?: boolean;
+};
+
+export const ToknNavbar: FC<ToknNavbarProps> = ({ signedIn = false }) => {
   return (
     <nav>
       <a className="nav-logo" href="/">
@@ -14,12 +18,25 @@ export const ToknNavbar: FC = () => {
         <a href="/tokens">Docs</a>
       </div>
       <div className="nav-right">
-        <a href="/signin" className="btn-ghost-sm">
-          Sign in
-        </a>
-        <a href="/signup" className="btn-primary-sm">
-          Start free →
-        </a>
+        {signedIn ? (
+          <>
+            <a href="/projects" className="btn-primary-sm">
+              Open projects →
+            </a>
+            <a href="/settings" className="btn-ghost-sm">
+              Account
+            </a>
+          </>
+        ) : (
+          <>
+            <a href="/signin" className="btn-ghost-sm">
+              Sign in
+            </a>
+            <a href="/signup" className="btn-primary-sm">
+              Start free →
+            </a>
+          </>
+        )}
       </div>
     </nav>
   );

@@ -11,13 +11,17 @@ import { ToknPricing } from "@/components/tokn-landing/tokn-pricing";
 import { ToknFinalCta } from "@/components/tokn-landing/tokn-final-cta";
 import { ToknFooter } from "@/components/tokn-landing/tokn-footer";
 
-export function ToknLandingPage() {
+type ToknLandingPageProps = {
+  signedIn?: boolean;
+};
+
+export function ToknLandingPage({ signedIn = false }: ToknLandingPageProps) {
   return (
     <>
       <ToknMarketingStyles />
       <ToknLandingReveal>
-        <ToknNavbar />
-        <ToknHero />
+        <ToknNavbar signedIn={signedIn} />
+        <ToknHero signedIn={signedIn} />
         <ToknProblem />
         <ToknHowItWorks />
         <ToknFeatures />

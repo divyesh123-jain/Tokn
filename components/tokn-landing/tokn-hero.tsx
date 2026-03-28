@@ -1,6 +1,10 @@
 import type { FC } from "react";
 
-export const ToknHero: FC = () => {
+type ToknHeroProps = {
+  signedIn?: boolean;
+};
+
+export const ToknHero: FC<ToknHeroProps> = ({ signedIn = false }) => {
   return (
     <section className="hero">
       <div className="hero-badge">
@@ -20,23 +24,43 @@ export const ToknHero: FC = () => {
       </p>
 
       <div className="hero-cta">
-        <a href="/signup" className="btn-primary-lg">
-          Start free
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M3 7h8M8 4l3 3-3 3"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-        </a>
+        {signedIn ? (
+          <a href="/projects" className="btn-primary-lg">
+            Continue to projects
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 7h8M8 4l3 3-3 3"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </a>
+        ) : (
+          <a href="/signup" className="btn-primary-lg">
+            Start free
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 7h8M8 4l3 3-3 3"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </a>
+        )}
         <a href="#how" className="btn-outline-lg">
           See how it works
         </a>

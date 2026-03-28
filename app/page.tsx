@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ThemePicker } from "@/components/theme-picker";
 import { ToknLandingPage } from "@/components/tokn-landing-page";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 function LogoMark() {
   return (
@@ -10,8 +11,19 @@ function LogoMark() {
   );
 }
 
-export default function Home() {
-  return <ToknLandingPage />;
+export default async function Home() {
+  let signedIn = false;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    signedIn = Boolean(user);
+  } catch {
+    signedIn = false;
+  }
+
+  return <ToknLandingPage signedIn={signedIn} />;
   return (
     <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <div className="pointer-events-none absolute inset-0">

@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  Check,
   ChevronDown,
   Clock,
   Globe,
   HelpCircle,
   Inbox,
   LayoutGrid,
+  LogOut,
   Loader2,
   MoreHorizontal,
   Plus,
@@ -27,7 +29,10 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -43,6 +48,12 @@ import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import { cn } from "@/lib/utils";
 import { useUiPrefs } from "@/lib/ui-prefs";
 import type { WorkspaceKind, WorkspaceSummary } from "@/lib/workspace-types";
+
+type AuthUser = {
+  id: string;
+  email: string;
+  fullName: string | null;
+};
 
 const NAV = [
   { key: "all", label: "All projects", icon: LayoutGrid },
@@ -72,6 +83,8 @@ export function ProjectsHome() {
   const [newName, setNewName] = React.useState("");
   const [kind, setKind] = React.useState<WorkspaceKind>("individual");
   const [creating, setCreating] = React.useState(false);
+  const [authUser, setAuthUser] = React.useState<AuthUser | null>(null);
+  const [loggingOut, setLoggingOut] = React.useState(false);
 
   const refresh = React.useCallback(async () => {
     const res = await fetch("/api/workspaces", workspaceApiFetchInit);
@@ -98,6 +111,28 @@ export function ProjectsHome() {
       cancelled = true;
     };
   }, [refresh]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadAuthUser() {
+      const res = await fetch("/api/auth/me", workspaceApiFetchInit);
+      if (cancelled) return;
+      if (res.status === 401) {
+        scheduleRouterAction(() => router.push("/signin"));
+        return;
+      }
+      if (!res.ok) return;
+      const data = (await res.json().catch(() => null)) as { user?: AuthUser } | null;
+      if (!data?.user) return;
+      setAuthUser(data.user);
+    }
+
+    void loadAuthUser();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const filtered = React.useMemo(() => {
     let list = workspaces;
@@ -171,20 +206,73 @@ export function ProjectsHome() {
     await refresh();
   }
 
+  async function signOut() {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/signout", {
+        ...workspaceApiFetchInit,
+        method: "POST",
+      });
+    } finally {
+      window.location.assign("/signin");
+    }
+  }
+
+  const displayName = authUser?.fullName?.trim() || authUser?.email || workspaceLabel;
+
   return (
     <div className="flex h-screen bg-background text-foreground">
       <aside className="flex w-[260px] shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
         <div className="border-b border-sidebar-border p-3">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold hover:bg-sidebar-accent/80"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-              {initialsFromLabel(workspaceLabel)}
-            </span>
-            <span className="min-w-0 flex-1 truncate">{workspaceLabel}</span>
-            <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold hover:bg-sidebar-accent/80"
+              aria-label="Open account menu"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {initialsFromLabel(displayName)}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{displayName}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" sideOffset={8} className="w-64 min-w-64">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>
+                  <div className="flex flex-col">
+                    <span className="truncate text-sm font-semibold text-foreground">{displayName}</span>
+                    {authUser?.email ? (
+                      <span className="truncate text-xs text-muted-foreground">{authUser.email}</span>
+                    ) : null}
+                  </div>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => scheduleRouterAction(() => router.push("/projects"))}>
+                <Check className="h-4 w-4" />
+                Projects
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => scheduleRouterAction(() => router.push("/settings"))}>
+                <Settings className="h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => scheduleRouterAction(() => router.push("/signup"))}>
+                <User className="h-4 w-4" />
+                Add account
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={loggingOut}
+                onClick={() => {
+                  void signOut();
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                {loggingOut ? "Logging out..." : "Log out"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <div className="relative mt-2">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
