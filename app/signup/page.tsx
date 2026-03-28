@@ -1,13 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
 import { ToknSignUpMarketing } from "@/components/tokn-signup-marketing";
 
 export default function SignUpPage() {
-  const router = useRouter();
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -33,7 +31,7 @@ export default function SignUpPage() {
         return;
       }
 
-      router.push(json.redirectTo);
+      window.location.assign(json.redirectTo);
     } catch {
       toast.error("Signup failed");
     } finally {

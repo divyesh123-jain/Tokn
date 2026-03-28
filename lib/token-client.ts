@@ -24,14 +24,14 @@ function tokenToApiBody(t: MotionTokenItem) {
 
 export function buildCreateTokenBody(overrides: Partial<MotionTokenItem> = {}): Omit<
   MotionTokenItem,
-  "id"
+  "id" | "pendingSync"
 > {
   return { ...TOKEN_DEFAULTS, name: "untitled", ...overrides };
 }
 
 export async function createTokenRemote(
   workspaceId: string,
-  body: Omit<MotionTokenItem, "id">,
+  body: Omit<MotionTokenItem, "id" | "pendingSync">,
 ): Promise<MotionTokenItem> {
   const res = await fetch(`/api/workspaces/${workspaceId}/tokens`, {
     ...workspaceApiFetchInit,
@@ -44,7 +44,7 @@ export async function createTokenRemote(
     toast.error(json?.error ?? "Could not create token");
     throw new Error(json?.error ?? "create failed");
   }
-  return json.token;
+  return { ...json.token, pendingSync: false };
 }
 
 export async function patchTokenRemote(
@@ -63,7 +63,7 @@ export async function patchTokenRemote(
     toast.error(json?.error ?? "Could not save token");
     throw new Error(json?.error ?? "patch failed");
   }
-  return json.token;
+  return { ...json.token, pendingSync: false };
 }
 
 export async function deleteTokenRemote(
@@ -82,5 +82,5 @@ export async function deleteTokenRemote(
     toast.error(json?.error ?? "Could not delete token");
     throw new Error(json?.error ?? "delete failed");
   }
-  return json.token;
+  return { ...json.token, pendingSync: false };
 }

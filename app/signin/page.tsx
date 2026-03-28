@@ -1,12 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { ToknSignInMarketing } from "@/components/tokn-signin-marketing";
 
 export default function SignInPage() {
-  const router = useRouter();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
@@ -32,7 +30,7 @@ export default function SignInPage() {
         return;
       }
 
-      router.push(json.redirectTo);
+      window.location.assign(json.redirectTo);
     } catch {
       toast.error("Signin failed");
     } finally {

@@ -38,10 +38,16 @@ export async function createSupabaseServerClient() {
         name: string,
         options: { httpOnly?: boolean } & Record<string, unknown>,
       ) {
+        const normalized = {
+          ...options,
+          path: (options.path as string | undefined) ?? "/",
+          maxAge: 0,
+          expires: new Date(0),
+        };
         cookieStore.set(
           name,
           "",
-          options as {
+          normalized as {
             httpOnly?: boolean;
             sameSite?: "lax" | "strict" | "none";
             path?: string;

@@ -24,6 +24,7 @@ export function scheduleWorkspaceTokenPatch(
   const t = setTimeout(() => {
     timers.delete(key);
     const token = getState().tokens.find((x) => x.id === tokenId);
+    if (token?.pendingSync) return;
     if (!token?.name?.trim()) return;
     void patchTokenRemote(workspaceId, tokenId, token)
       .then((server) => {
@@ -63,6 +64,7 @@ export async function flushWorkspaceTokenPatches(
     timers.delete(key);
     const tokenId = key.slice(workspaceId.length + 1);
     const token = getState().tokens.find((x) => x.id === tokenId);
+    if (token?.pendingSync) continue;
     if (token?.name?.trim()) {
       await patchTokenRemote(workspaceId, tokenId, token).catch(() => {});
     }

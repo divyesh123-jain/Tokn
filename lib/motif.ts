@@ -21,6 +21,7 @@ export const categoryConfig: Record<MotionTokenCategory, CategoryConfig> = {
 
 export type MotionTokenItem = {
   id: string;
+  pendingSync: boolean;
   name: string;
   category: MotionTokenCategory;
   durationMs: number;
@@ -45,6 +46,7 @@ export const SPRING_DEFAULTS = {
 };
 
 export const TOKEN_DEFAULTS: Omit<MotionTokenItem, "id"> = {
+  pendingSync: false,
   name: "",
   category: "enter",
   durationMs: 300,
@@ -58,7 +60,7 @@ export const TOKEN_DEFAULTS: Omit<MotionTokenItem, "id"> = {
   deprecated: false,
 };
 
-export const initialMotionTokens: MotionTokenItem[] = [
+const initialMotionTokensBase: Omit<MotionTokenItem, "pendingSync">[] = [
   {
     id: "tok_01",
     name: "enter.default",
@@ -252,6 +254,10 @@ export const initialMotionTokens: MotionTokenItem[] = [
     deprecated: false,
   },
 ];
+
+export const initialMotionTokens: MotionTokenItem[] = initialMotionTokensBase.map(
+  (token) => ({ ...token, pendingSync: false }),
+);
 
 export const categoryOrder: MotionTokenCategory[] = [
   "enter",

@@ -78,7 +78,7 @@ export const useTokenStore = create<TokenEditorStore>()(
       replaceTokens: (tokens, selectedId) => {
         setSkipTokenPatches(true);
         set({
-          tokens,
+          tokens: tokens.map((t) => ({ ...t, pendingSync: Boolean(t.pendingSync) })),
           selectedId: selectedId ?? tokens[0]?.id ?? null,
           tokensHydrating: false,
         });
@@ -111,9 +111,14 @@ export const useTokenStore = create<TokenEditorStore>()(
         if (!ws) return;
         const token = get().tokens.find((t) => t.id === id);
         if (!token) return;
+        if (token.pendingSync) {
+          return;
+        }
         const server = await patchTokenRemote(ws, id, token);
         set((s) => ({
-          tokens: s.tokens.map((t) => (t.id === id ? { ...t, ...server } : t)),
+          tokens: s.tokens.map((t) =>
+            t.id === id ? { ...t, ...server, pendingSync: false } : t,
+          ),
         }));
       },
 
@@ -131,38 +136,52 @@ export const useTokenStore = create<TokenEditorStore>()(
         if (!ws) return;
         const token = get().tokens.find((t) => t.id === id);
         if (!token?.name?.trim()) return;
+        if (token.pendingSync) return;
         scheduleWorkspaceTokenPatch(ws, id, get);
       },
 
       createToken: async () => {
         const ws = get().workspaceId;
-        if (!ws) {
-          const id = crypto.randomUUID();
-          const token: MotionTokenItem = {
-            ...TOKEN_DEFAULTS,
-            id,
-            name: "",
-            updatedAt: new Date().toISOString(),
-          };
-          set((s) => ({
-            tokens: [...s.tokens, token],
-            selectedId: id,
-            nameFocusTargetId: id,
-            nameFocusSelectAll: false,
-            replayKey: s.replayKey + 1,
-          }));
-          return;
-        }
+        const id = crypto.randomUUID();
+        const token: MotionTokenItem = {
+          ...TOKEN_DEFAULTS,
+          id,
+          name: "",
+          updatedAt: new Date().toISOString(),
+          pendingSync: Boolean(ws),
+        };
+        set((s) => ({
+          tokens: [...s.tokens, token],
+          selectedId: id,
+          nameFocusTargetId: id,
+          nameFocusSelectAll: false,
+          replayKey: s.replayKey + 1,
+        }));
+
+        if (!ws) return;
+
         try {
-          const body = buildCreateTokenBody();
-          const created = await createTokenRemote(ws, body);
-          set((s) => ({
-            tokens: [...s.tokens, created],
-            selectedId: created.id,
-            nameFocusTargetId: created.id,
-            nameFocusSelectAll: false,
-            replayKey: s.replayKey + 1,
-          }));
+          const created = await createTokenRemote(ws, buildCreateTokenBody());
+          set((s) => {
+            const draft = s.tokens.find((t) => t.id === id);
+            if (!draft) return {};
+            const reconciled: MotionTokenItem = {
+              ...created,
+              ...draft,
+              id: created.id,
+              pendingSync: false,
+            };
+            return {
+              tokens: s.tokens.map((t) => (t.id === id ? reconciled : t)),
+              selectedId: s.selectedId === id ? created.id : s.selectedId,
+              nameFocusTargetId:
+                s.nameFocusTargetId === id ? created.id : s.nameFocusTargetId,
+            };
+          });
+          const synced = get().tokens.find((t) => t.id === created.id);
+          if (synced?.name?.trim()) {
+            scheduleWorkspaceTokenPatch(ws, created.id, get);
+          }
         } catch {
           /* toast in token-client */
         }
@@ -180,6 +199,7 @@ export const useTokenStore = create<TokenEditorStore>()(
             id: nextId,
             name: `copy of ${source.name || "untitled"}`,
             updatedAt: new Date().toISOString(),
+            pendingSync: false,
           };
           set((s) => {
             const index = s.tokens.findIndex((t) => t.id === id);
@@ -207,7 +227,7 @@ export const useTokenStore = create<TokenEditorStore>()(
             const index = s.tokens.findIndex((t) => t.id === id);
             const nextTokens = [...s.tokens];
             const insertAt = index === -1 ? nextTokens.length : index + 1;
-            nextTokens.splice(insertAt, 0, created);
+            nextTokens.splice(insertAt, 0, { ...created, pendingSync: false });
             return {
               tokens: nextTokens,
               selectedId: created.id,
@@ -264,7 +284,9 @@ export const useTokenStore = create<TokenEditorStore>()(
         try {
           const updated = await deleteTokenRemote(ws, id, true);
           set((s) => ({
-            tokens: s.tokens.map((t) => (t.id === id ? updated : t)),
+            tokens: s.tokens.map((t) =>
+              t.id === id ? { ...updated, pendingSync: false } : t,
+            ),
             replayKey: s.replayKey + 1,
           }));
         } catch {
@@ -299,6 +321,7 @@ export async function leaveWorkspaceSession(workspaceId: string) {
   const snapshot = useTokenStore.getState().tokens.map((t) => ({ ...t }));
   const results = await Promise.allSettled(
     snapshot.map((t) => {
+      if (t.pendingSync) return Promise.resolve();
       if (!t.name.trim()) return Promise.resolve();
       return patchTokenRemote(workspaceId, t.id, t);
     }),
