@@ -39,6 +39,6 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL("/signin", req.url));
   }
 
-  return NextResponse.redirect(new URL("/dashboard", req.url));
+  return NextResponse.redirect(new URL("/projects", req.url));
 }
 

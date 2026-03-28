@@ -85,9 +85,14 @@ const CODE_TABS: { key: CodeFormat; label: string }[] = [
   { key: "json", label: "JSON" },
 ];
 
-export function MotionStudio() {
+export function MotionStudio({ embedded }: { embedded?: boolean } = {}) {
   return (
-    <div className="relative h-screen overflow-hidden">
+    <div
+      className={cn(
+        "relative overflow-hidden",
+        embedded ? "h-full min-h-0" : "h-screen",
+      )}
+    >
       {/* <div className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2">
         <nav className="flex items-center gap-2 overflow-x-auto rounded-xl border border-border bg-card/70 px-2 py-1.5 backdrop-blur">
           <Link

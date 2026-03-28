@@ -1,5 +1,5 @@
-import { MotionStudio } from "@/components/motion-studio";
+import { redirect } from "next/navigation";
 
 export default function DashboardPage() {
-  return <MotionStudio />;
+  redirect("/projects");
 }

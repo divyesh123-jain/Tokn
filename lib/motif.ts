@@ -259,7 +259,7 @@ export const categoryOrder: MotionTokenCategory[] = [
 ];
 
 export const appNav: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", description: "System health and rollout status" },
+  { href: "/projects", label: "Projects", description: "Your motion libraries and files" },
   { href: "/tokens", label: "Tokens", description: "Define and manage motion primitives" },
   { href: "/preview", label: "Preview Lab", description: "Validate motion on canonical components" },
   { href: "/releases", label: "Releases", description: "Publish, version, and roll back safely" },

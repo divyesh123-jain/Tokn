@@ -30,7 +30,7 @@ export default function ForgotPasswordPage() {
             className="mt-7 space-y-5"
             onSubmit={(e) => {
               e.preventDefault();
-              window.location.href = "/dashboard";
+              window.location.href = "/projects";
             }}
           >
             <div className="space-y-2">

@@ -166,7 +166,7 @@ export function ToknSignUpMarketing(props: ToknSignUpMarketingProps) {
             </a>
 
             <a
-              href="/dashboard"
+              href="/projects"
               className="auth-social-btn"
               style={{ textDecoration: "none" }}
             >

@@ -47,6 +47,6 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, redirectTo: "/dashboard" });
+  return NextResponse.json({ ok: true, redirectTo: "/projects" });
 }
 

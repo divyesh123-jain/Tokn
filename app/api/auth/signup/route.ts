@@ -48,7 +48,7 @@ export async function POST(req: Request) {
         console.error("Postgres user upsert failed (non-blocking)", e);
       }
     }
-    return NextResponse.json({ ok: true, redirectTo: "/dashboard" });
+    return NextResponse.json({ ok: true, redirectTo: "/projects" });
   }
 
   return NextResponse.json({ ok: true, redirectTo: "/signin?verify=1" });
