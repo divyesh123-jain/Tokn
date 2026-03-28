@@ -34,6 +34,8 @@ export type MotionTokenItem = {
   springDamping: number;
   springMass: number;
   deprecated: boolean;
+  /** ISO 8601 from DB or client when the token last changed */
+  updatedAt?: string;
 };
 
 export const SPRING_DEFAULTS = {

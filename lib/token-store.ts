@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { toast } from "sonner";
 
 import {
   type MotionTokenItem,
@@ -10,10 +11,11 @@ import {
   buildCreateTokenBody,
   createTokenRemote,
   deleteTokenRemote,
+  patchTokenRemote,
 } from "./token-client";
 import {
+  cancelPendingTokenPatch,
   clearWorkspaceTokenPatches,
-  flushWorkspaceTokenPatches,
   scheduleWorkspaceTokenPatch,
   setSkipTokenPatches,
 } from "./workspace-token-sync";
@@ -51,6 +53,7 @@ type TokenEditorStore = {
   setCodeFormat: (fmt: CodeFormat) => void;
   clearNameFocusRequest: () => void;
   replay: () => void;
+  saveTokenName: (id: string, name: string) => Promise<void>;
 };
 
 export const useTokenStore = create<TokenEditorStore>()(
@@ -95,9 +98,33 @@ export const useTokenStore = create<TokenEditorStore>()(
       selectToken: (id) =>
         set({ selectedId: id, replayKey: get().replayKey + 1 }),
 
-      updateToken: (id, patch) => {
+      saveTokenName: async (id, name) => {
+        const trimmed = name.trim() || "untitled";
+        const ws = get().workspaceId;
+        if (ws) cancelPendingTokenPatch(ws, id);
+        const now = new Date().toISOString();
         set((s) => ({
-          tokens: s.tokens.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+          tokens: s.tokens.map((t) =>
+            t.id === id ? { ...t, name: trimmed, updatedAt: now } : t,
+          ),
+        }));
+        if (!ws) return;
+        const token = get().tokens.find((t) => t.id === id);
+        if (!token) return;
+        const server = await patchTokenRemote(ws, id, token);
+        set((s) => ({
+          tokens: s.tokens.map((t) => (t.id === id ? { ...t, ...server } : t)),
+        }));
+      },
+
+      updateToken: (id, patch) => {
+        const { name: _dropName, ...rest } = patch as Partial<MotionTokenItem>;
+        if (Object.keys(rest).length === 0) return;
+        const now = new Date().toISOString();
+        set((s) => ({
+          tokens: s.tokens.map((t) =>
+            t.id === id ? { ...t, ...rest, updatedAt: now } : t,
+          ),
           replayKey: s.replayKey + 1,
         }));
         const ws = get().workspaceId;
@@ -111,7 +138,12 @@ export const useTokenStore = create<TokenEditorStore>()(
         const ws = get().workspaceId;
         if (!ws) {
           const id = crypto.randomUUID();
-          const token: MotionTokenItem = { ...TOKEN_DEFAULTS, id, name: "" };
+          const token: MotionTokenItem = {
+            ...TOKEN_DEFAULTS,
+            id,
+            name: "",
+            updatedAt: new Date().toISOString(),
+          };
           set((s) => ({
             tokens: [...s.tokens, token],
             selectedId: id,
@@ -147,6 +179,7 @@ export const useTokenStore = create<TokenEditorStore>()(
             ...rest,
             id: nextId,
             name: `copy of ${source.name || "untitled"}`,
+            updatedAt: new Date().toISOString(),
           };
           set((s) => {
             const index = s.tokens.findIndex((t) => t.id === id);
@@ -262,8 +295,18 @@ export const useTokenStore = create<TokenEditorStore>()(
 );
 
 export async function leaveWorkspaceSession(workspaceId: string) {
-  await flushWorkspaceTokenPatches(workspaceId, () => useTokenStore.getState());
   clearWorkspaceTokenPatches();
+  const snapshot = useTokenStore.getState().tokens.map((t) => ({ ...t }));
+  const results = await Promise.allSettled(
+    snapshot.map((t) => {
+      if (!t.name.trim()) return Promise.resolve();
+      return patchTokenRemote(workspaceId, t.id, t);
+    }),
+  );
+  const failed = results.filter((r) => r.status === "rejected").length;
+  if (failed > 0) {
+    toast.error("Some changes could not be saved. Check your connection and try again.");
+  }
   useTokenStore.setState({
     workspaceId: null,
     tokens: initialMotionTokens,

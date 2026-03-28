@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Copy, ExternalLink, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,15 +68,33 @@ export function TokenLibrary() {
     selectedId,
     selectToken,
     updateToken,
+    saveTokenName,
     deleteToken,
   } = useTokenStore();
   const selectedToken = useSelectedToken();
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
   const [activeCategory, setActiveCategory] = useState<MotionTokenCategory | "all">(
     "all",
   );
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
+
+  useEffect(() => {
+    if (selectedToken) setNameDraft(selectedToken.name);
+    else setNameDraft("");
+  }, [selectedToken?.id]);
+
+  const nameConflict = useMemo(() => {
+    if (!selectedToken || !nameDraft.trim()) return false;
+    const next = nameDraft.trim();
+    return tokens.some((t) => t.id !== selectedToken.id && t.name === next);
+  }, [tokens, selectedToken, nameDraft]);
+
+  const nameDirty =
+    !!selectedToken &&
+    nameDraft.trim() !== (selectedToken.name || "").trim();
 
   const filtered = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -300,15 +319,54 @@ export function TokenLibrary() {
               </p>
             ) : (
               <>
-                <label className="block space-y-1">
+                <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">Name</span>
-                  <Input
-                    value={selectedToken.name}
-                    onChange={(event) =>
-                      updateToken(selectedToken.id, { name: event.target.value })
-                    }
-                  />
-                </label>
+                  <div className="flex gap-2">
+                    <Input
+                      className="flex-1"
+                      value={nameDraft}
+                      onChange={(event) => setNameDraft(event.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void (async () => {
+                            if (!selectedToken || nameConflict || !nameDirty) return;
+                            setNameSaving(true);
+                            try {
+                              await saveTokenName(selectedToken.id, nameDraft);
+                              toast.success("Name saved");
+                            } finally {
+                              setNameSaving(false);
+                            }
+                          })();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="shrink-0"
+                      disabled={!nameDirty || nameConflict || nameSaving}
+                      onClick={() =>
+                        void (async () => {
+                          if (!selectedToken || nameConflict) return;
+                          setNameSaving(true);
+                          try {
+                            await saveTokenName(selectedToken.id, nameDraft);
+                            toast.success("Name saved");
+                          } finally {
+                            setNameSaving(false);
+                          }
+                        })()
+                      }
+                    >
+                      {nameSaving ? "…" : "Save"}
+                    </Button>
+                  </div>
+                  {nameConflict && (
+                    <p className="text-[11px] text-red-500">Name already taken</p>
+                  )}
+                </div>
 
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Category</Label>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Copy, MoreHorizontal, Pencil, Play, Plus, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { recentUpdateLabel } from "@/lib/token-recent";
 import { cn } from "@/lib/utils";
 import {
   type MotionTokenItem,
@@ -142,6 +145,7 @@ function TokenListPanel() {
     selectToken,
     createToken,
     updateToken,
+    saveTokenName,
     duplicateToken,
     deleteToken,
     softDeleteToken,
@@ -182,7 +186,12 @@ function TokenListPanel() {
 
   function submitRename() {
     if (!editingTokenId) return;
-    updateToken(editingTokenId, { name: inlineName });
+    const next = inlineName.trim() || "untitled";
+    if (tokens.some((t) => t.id !== editingTokenId && t.name === next)) {
+      toast.error("That name is already taken");
+      return;
+    }
+    void saveTokenName(editingTokenId, inlineName);
     setEditingTokenId(null);
     setInlineName("");
   }
@@ -285,16 +294,28 @@ function TokenListPanel() {
                         <button
                           type="button"
                           onClick={() => selectToken(token.id)}
-                          className="flex min-w-0 flex-1 items-center text-left"
+                          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                         >
-                        <span
-                          className={cn(
-                            "flex-1 truncate text-xs font-medium",
-                            sel ? "text-[#3C3489]" : "text-foreground",
-                          )}
-                        >
-                          {token.name || "untitled"}
-                        </span>
+                          <span
+                            className={cn(
+                              "min-w-0 flex-1 truncate text-xs font-medium",
+                              sel ? "text-[#3C3489]" : "text-foreground",
+                            )}
+                          >
+                            {token.name || "untitled"}
+                          </span>
+                          {(() => {
+                            const rel = recentUpdateLabel(token.updatedAt);
+                            return rel ? (
+                              <Badge
+                                variant="secondary"
+                                className="h-4 shrink-0 border-0 bg-primary/10 px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-primary"
+                                title={token.updatedAt ? new Date(token.updatedAt).toLocaleString() : undefined}
+                              >
+                                {rel}
+                              </Badge>
+                            ) : null;
+                          })()}
                         </button>
                       )}
                     </div>
@@ -542,6 +563,7 @@ function PropertiesPanel() {
   const {
     tokens,
     updateToken,
+    saveTokenName,
     codeFormat,
     setCodeFormat,
     duplicateToken,
@@ -552,17 +574,27 @@ function PropertiesPanel() {
   const token = useSelectedToken();
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (token) setNameDraft(token.name);
+  }, [token?.id]);
+
   const nameConflict = useMemo(() => {
-    if (!token || !token.name.trim()) return false;
-    return tokens.some((t) => t.id !== token.id && t.name === token.name);
-  }, [tokens, token]);
+    if (!token || !nameDraft.trim()) return false;
+    const next = nameDraft.trim();
+    return tokens.some((t) => t.id !== token.id && t.name === next);
+  }, [tokens, token, nameDraft]);
+
+  const nameDirty =
+    !!token && nameDraft.trim() !== (token.name || "").trim();
 
   const code = useMemo(() => {
     if (!token) return { framerMotion: "", css: "", tailwind: "", json: "" };
-    return transformToken(token);
-  }, [token]);
+    return transformToken({ ...token, name: nameDraft });
+  }, [token, nameDraft]);
 
   useEffect(() => {
     if (!token || !nameInputRef.current) return;
@@ -589,6 +621,17 @@ function PropertiesPanel() {
 
   function update(patch: Partial<MotionTokenItem>) {
     updateToken(token!.id, patch);
+  }
+
+  async function commitTokenName() {
+    if (!token || nameConflict) return;
+    setNameSaving(true);
+    try {
+      await saveTokenName(token.id, nameDraft);
+      toast.success("Name saved");
+    } finally {
+      setNameSaving(false);
+    }
   }
 
   function handleBlur() {
@@ -628,27 +671,58 @@ function PropertiesPanel() {
               <Copy className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <div className="relative">
-            <Input
-              ref={nameInputRef}
-              value={token.name}
-              onChange={(e) => update({ name: e.target.value })}
-              onBlur={handleBlur}
-              placeholder="enter.default"
-              className={cn(
-                "h-auto rounded-lg border bg-background px-2.5 py-1.5 font-mono text-xs focus-visible:ring-2 focus-visible:ring-ring",
-                nameConflict ? "border-red-400" : "border-border",
+          <div className="flex gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Input
+                ref={nameInputRef}
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void commitTokenName();
+                  }
+                }}
+                placeholder="enter.default"
+                className={cn(
+                  "h-auto rounded-lg border bg-background px-2.5 py-1.5 pr-8 font-mono text-xs focus-visible:ring-2 focus-visible:ring-ring",
+                  nameConflict ? "border-red-400" : "border-border",
+                )}
+              />
+              {nameDirty && !nameConflict && nameDraft.trim() && (
+                <span className="pointer-events-none absolute right-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-amber-500" />
               )}
-            />
-            {token.name.trim() && !nameConflict && (
-              <Check className="absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-green-500" />
-            )}
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 shrink-0 px-3 text-xs"
+              disabled={!nameDirty || nameConflict || nameSaving}
+              onClick={() => void commitTokenName()}
+            >
+              {nameSaving ? "…" : "Save"}
+            </Button>
           </div>
           {nameConflict && (
             <p className="mt-1 text-[10px] text-red-500">
               This name is already taken
             </p>
           )}
+          {token.updatedAt && (() => {
+            const rel = recentUpdateLabel(token.updatedAt);
+            return (
+              <p className="mt-1.5 text-[10px] text-muted-foreground">
+                {rel ? (
+                  <>
+                    Updated{" "}
+                    <span className="font-medium text-foreground">{rel}</span>
+                  </>
+                ) : (
+                  <>Updated {new Date(token.updatedAt).toLocaleString()}</>
+                )}
+              </p>
+            );
+          })()}
         </div>
 
         <div className="mb-5">

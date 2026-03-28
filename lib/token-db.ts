@@ -22,7 +22,16 @@ export type MotionTokenDbRow = {
   deprecated: boolean;
 };
 
-export function motionTokenDbRowToItem(row: MotionTokenDbRow): MotionTokenItem {
+function toUpdatedAtIso(v: Date | string | undefined): string | undefined {
+  if (v == null) return undefined;
+  if (v instanceof Date) return v.toISOString();
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+export function motionTokenDbRowToItem(
+  row: MotionTokenDbRow & { updatedAt?: Date | string },
+): MotionTokenItem {
   return {
     id: row.id,
     name: row.name,
@@ -38,6 +47,7 @@ export function motionTokenDbRowToItem(row: MotionTokenDbRow): MotionTokenItem {
     springDamping: row.springDamping,
     springMass: row.springMass / SPRING_MASS_FACTOR,
     deprecated: row.deprecated,
+    updatedAt: toUpdatedAtIso(row.updatedAt),
   };
 }
 

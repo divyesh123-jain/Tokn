@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 
 import type { MotionTokenItem } from "@/lib/motif";
+import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import { TOKEN_DEFAULTS } from "@/lib/motif";
 
 function tokenToApiBody(t: MotionTokenItem) {
@@ -33,6 +34,7 @@ export async function createTokenRemote(
   body: Omit<MotionTokenItem, "id">,
 ): Promise<MotionTokenItem> {
   const res = await fetch(`/api/workspaces/${workspaceId}/tokens`, {
+    ...workspaceApiFetchInit,
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(tokenToApiBody(body as MotionTokenItem)),
@@ -51,6 +53,7 @@ export async function patchTokenRemote(
   token: MotionTokenItem,
 ): Promise<MotionTokenItem> {
   const res = await fetch(`/api/workspaces/${workspaceId}/tokens/${tokenId}`, {
+    ...workspaceApiFetchInit,
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(tokenToApiBody(token)),
@@ -69,6 +72,7 @@ export async function deleteTokenRemote(
   soft: boolean,
 ): Promise<MotionTokenItem> {
   const res = await fetch(`/api/workspaces/${workspaceId}/tokens/${tokenId}`, {
+    ...workspaceApiFetchInit,
     method: "DELETE",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ soft }),

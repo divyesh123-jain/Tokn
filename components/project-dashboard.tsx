@@ -11,6 +11,7 @@ import { ThemePicker } from "@/components/theme-picker";
 import { leaveWorkspaceSession, useTokenStore } from "@/lib/token-store";
 import type { MotionTokenItem } from "@/lib/motif";
 import { scheduleRouterAction } from "@/lib/safe-router";
+import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import { cn } from "@/lib/utils";
 import type { WorkspaceSummary } from "@/lib/workspace-types";
 
@@ -29,8 +30,8 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
         selectedId: null,
       });
       const [wRes, tRes] = await Promise.all([
-        fetch(`/api/workspaces/${projectId}`),
-        fetch(`/api/workspaces/${projectId}/tokens`),
+        fetch(`/api/workspaces/${projectId}`, workspaceApiFetchInit),
+        fetch(`/api/workspaces/${projectId}/tokens`, workspaceApiFetchInit),
       ]);
       if (cancelled) return;
       if (wRes.status === 401 || tRes.status === 401) {

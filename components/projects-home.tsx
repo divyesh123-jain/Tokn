@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { scheduleRouterAction } from "@/lib/safe-router";
+import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import { cn } from "@/lib/utils";
 import { useUiPrefs } from "@/lib/ui-prefs";
 import type { WorkspaceKind, WorkspaceSummary } from "@/lib/workspace-types";
@@ -73,7 +74,7 @@ export function ProjectsHome() {
   const [creating, setCreating] = React.useState(false);
 
   const refresh = React.useCallback(async () => {
-    const res = await fetch("/api/workspaces");
+    const res = await fetch("/api/workspaces", workspaceApiFetchInit);
     if (res.status === 401) {
       scheduleRouterAction(() => router.push("/signin"));
       return;
@@ -121,6 +122,7 @@ export function ProjectsHome() {
     setCreating(true);
     try {
       const res = await fetch("/api/workspaces", {
+        ...workspaceApiFetchInit,
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -152,7 +154,10 @@ export function ProjectsHome() {
 
   async function deleteWorkspace(id: string) {
     if (!window.confirm("Delete this project? This cannot be undone.")) return;
-    const res = await fetch(`/api/workspaces/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/workspaces/${id}`, {
+      ...workspaceApiFetchInit,
+      method: "DELETE",
+    });
     if (res.status === 401) {
       scheduleRouterAction(() => router.push("/signin"));
       return;
