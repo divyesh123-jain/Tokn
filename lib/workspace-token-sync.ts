@@ -53,6 +53,13 @@ export function clearWorkspaceTokenPatches() {
   timers.clear();
 }
 
+export function hasPendingWorkspaceTokenPatches(workspaceId: string) {
+  for (const key of timers.keys()) {
+    if (key.startsWith(`${workspaceId}:`)) return true;
+  }
+  return false;
+}
+
 export async function flushWorkspaceTokenPatches(
   workspaceId: string,
   getState: () => TokenSlice,

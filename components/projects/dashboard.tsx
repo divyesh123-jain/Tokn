@@ -8,7 +8,11 @@ import { ArrowLeft, Loader2, Share2 } from "lucide-react";
 import { MotionStudio } from "@/components/projects/motion-studio";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ThemePicker } from "@/components/theme/theme-picker";
-import { leaveWorkspaceSession, useTokenStore } from "@/lib/token-store";
+import {
+  hasPendingPatches,
+  leaveWorkspaceSession,
+  useTokenStore,
+} from "@/lib/token-store";
 import type { MotionTokenItem } from "@/lib/motif";
 import { scheduleRouterAction } from "@/lib/safe-router";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
@@ -62,6 +66,17 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
       void leaveWorkspaceSession(projectId);
     };
   }, [projectId, router]);
+
+  React.useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!hasPendingPatches(projectId)) return;
+      e.preventDefault();
+      e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [projectId]);
 
   if (!workspace || tokensHydrating) {
     return (

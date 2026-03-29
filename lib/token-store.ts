@@ -16,6 +16,8 @@ import {
 import {
   cancelPendingTokenPatch,
   clearWorkspaceTokenPatches,
+  flushWorkspaceTokenPatches,
+  hasPendingWorkspaceTokenPatches,
   scheduleWorkspaceTokenPatch,
   setSkipTokenPatches,
 } from "./workspace-token-sync";
@@ -317,7 +319,8 @@ export const useTokenStore = create<TokenEditorStore>()(
 );
 
 export async function leaveWorkspaceSession(workspaceId: string) {
-  clearWorkspaceTokenPatches();
+  if (useTokenStore.getState().workspaceId !== workspaceId) return;
+  await flushWorkspaceTokenPatches(workspaceId, useTokenStore.getState);
   const snapshot = useTokenStore.getState().tokens.map((t) => ({ ...t }));
   const results = await Promise.allSettled(
     snapshot.map((t) => {
@@ -330,12 +333,20 @@ export async function leaveWorkspaceSession(workspaceId: string) {
   if (failed > 0) {
     toast.error("Some changes could not be saved. Check your connection and try again.");
   }
+  if (useTokenStore.getState().workspaceId !== workspaceId) return;
   useTokenStore.setState({
     workspaceId: null,
     tokens: initialMotionTokens,
     selectedId: initialMotionTokens[0]?.id ?? null,
     tokensHydrating: false,
   });
+}
+
+export function hasPendingPatches(workspaceId: string) {
+  const state = useTokenStore.getState();
+  if (state.workspaceId !== workspaceId) return false;
+  if (hasPendingWorkspaceTokenPatches(workspaceId)) return true;
+  return state.tokens.some((t) => t.pendingSync && t.name.trim().length > 0);
 }
 
 export function useSelectedToken(): MotionTokenItem | null {
