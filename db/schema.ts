@@ -1,4 +1,10 @@
-import { boolean, integer, timestamp, uuid, varchar, pgTable, unique } from "drizzle-orm/pg-core";
+import { boolean, integer, timestamp, uuid, varchar, pgTable, unique, pgEnum } from "drizzle-orm/pg-core";
+
+export const workspaceMemberRoleEnum = pgEnum('workspace_member_role', [
+  'owner',
+  'editor',
+  'viewer'
+]);
 
 export const users = pgTable(
   "users",
@@ -32,7 +38,7 @@ export const workspaceMembers = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    role: varchar("role", { length: 20 }).notNull(),
+    role: workspaceMemberRoleEnum("role").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (t) => [
