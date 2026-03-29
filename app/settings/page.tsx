@@ -1,5 +1,5 @@
-import { AppShell } from "@/components/app-shell";
-import { ThemePicker } from "@/components/theme-picker";
+import { AppShell } from "@/components/layout/app-shell";
+import { ThemePicker } from "@/components/theme/theme-picker";
 
 const settingsBlocks = [
   {

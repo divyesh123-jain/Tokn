@@ -8,7 +8,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ThemePicker } from "@/components/theme-picker";
+import { ThemePicker } from "@/components/theme/theme-picker";
 import {
   DropdownMenu,
   DropdownMenuContent,

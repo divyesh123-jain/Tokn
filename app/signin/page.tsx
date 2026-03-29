@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { ToknSignInMarketing } from "@/components/tokn-signin-marketing";
+import { ToknSignInMarketing } from "@/components/marketing/signin-marketing";
 
 export default function SignInPage() {
   const [email, setEmail] = React.useState("");

@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Play } from "lucide-react";
 
-import { AppShell } from "@/components/app-shell";
+import { AppShell } from "@/components/layout/app-shell";
 import { useSelectedToken, useTokenStore, type PreviewComponent } from "@/lib/token-store";
 import type { MotionTokenItem } from "@/lib/motif";
 

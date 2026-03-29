@@ -3,7 +3,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 
-import { ToknSignUpMarketing } from "@/components/tokn-signup-marketing";
+import { ToknSignUpMarketing } from "@/components/marketing/signup-marketing";
 
 export default function SignUpPage() {
   const [name, setName] = React.useState("");

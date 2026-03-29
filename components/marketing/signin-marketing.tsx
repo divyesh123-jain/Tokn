@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
-import { ToknMarketingStyles } from "@/components/tokn-marketing-styles";
+import { ToknMarketingStyles } from "@/components/marketing/marketing-styles";
 
 function GoogleIcon() {
   return (

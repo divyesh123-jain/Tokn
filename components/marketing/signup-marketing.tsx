@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { ToknMarketingStyles } from "@/components/tokn-marketing-styles";
+import { ToknMarketingStyles } from "@/components/marketing/marketing-styles";
 
 function GoogleIcon() {
   return (

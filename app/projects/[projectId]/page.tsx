@@ -1,4 +1,4 @@
-import { ProjectDashboard } from "@/components/project-dashboard";
+import { ProjectDashboard } from "@/components/projects/dashboard";
 
 export default async function ProjectPage({
   params,

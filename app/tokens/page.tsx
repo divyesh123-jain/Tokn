@@ -1,5 +1,5 @@
-import { AppShell } from "@/components/app-shell";
-import { TokenLibrary } from "@/components/token-library";
+import { AppShell } from "@/components/layout/app-shell";
+import { TokenLibrary } from "@/components/tokens/library";
 
 const userFlowRows = [
   {

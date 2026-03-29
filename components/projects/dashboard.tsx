@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Share2 } from "lucide-react";
 
-import { MotionStudio } from "@/components/motion-studio";
+import { MotionStudio } from "@/components/projects/motion-studio";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { ThemePicker } from "@/components/theme-picker";
+import { ThemePicker } from "@/components/theme/theme-picker";
 import { leaveWorkspaceSession, useTokenStore } from "@/lib/token-store";
 import type { MotionTokenItem } from "@/lib/motif";
 import { scheduleRouterAction } from "@/lib/safe-router";

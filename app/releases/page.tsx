@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/app-shell";
+import { AppShell } from "@/components/layout/app-shell";
 
 const releases = [
   { version: "1.3.0", date: "2026-03-21", notes: "Refined enter/exit defaults" },

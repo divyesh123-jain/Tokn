@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ThemePicker } from "@/components/theme-picker";
-import { ToknLandingPage } from "@/components/tokn-landing-page";
+import { ThemePicker } from "@/components/theme/theme-picker";
+import { ToknLandingPage } from "@/components/marketing/landing-page";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 function LogoMark() {

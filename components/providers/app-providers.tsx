@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { ThemeProvider } from "next-themes";
 
 import { Toaster } from "@/components/ui/sonner";
-import { AccentThemeProvider } from "@/components/accent-theme-provider";
+import { AccentThemeProvider } from "@/components/theme/accent-theme-provider";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
