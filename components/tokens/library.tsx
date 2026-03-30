@@ -24,6 +24,7 @@ import {
   type MotionTokenCategory,
   type MotionTokenItem,
 } from "@/lib/motif";
+import { getTokenNameValidationError } from "@/lib/token-name";
 import { useSelectedToken, useTokenStore } from "@/lib/token-store";
 import { transformToken } from "@/lib/codegen";
 
@@ -91,6 +92,11 @@ export function TokenLibrary() {
     const next = nameDraft.trim();
     return tokens.some((t) => t.id !== selectedToken.id && t.name === next);
   }, [tokens, selectedToken, nameDraft]);
+
+  const nameValidationError = useMemo(() => {
+    if (!selectedToken) return null;
+    return getTokenNameValidationError(nameDraft);
+  }, [selectedToken, nameDraft]);
 
   const nameDirty =
     !!selectedToken &&
@@ -331,6 +337,7 @@ export function TokenLibrary() {
                           e.preventDefault();
                           void (async () => {
                             if (!selectedToken || nameConflict || !nameDirty) return;
+                            if (nameValidationError) return;
                             setNameSaving(true);
                             try {
                               await saveTokenName(selectedToken.id, nameDraft);
@@ -346,10 +353,10 @@ export function TokenLibrary() {
                       type="button"
                       size="sm"
                       className="shrink-0"
-                      disabled={!nameDirty || nameConflict || nameSaving}
+                      disabled={!nameDirty || nameConflict || Boolean(nameValidationError) || nameSaving}
                       onClick={() =>
                         void (async () => {
-                          if (!selectedToken || nameConflict) return;
+                          if (!selectedToken || nameConflict || nameValidationError) return;
                           setNameSaving(true);
                           try {
                             await saveTokenName(selectedToken.id, nameDraft);
@@ -365,6 +372,9 @@ export function TokenLibrary() {
                   </div>
                   {nameConflict && (
                     <p className="text-[11px] text-red-500">Name already taken</p>
+                  )}
+                  {nameValidationError && (
+                    <p className="text-[11px] text-red-500">{nameValidationError}</p>
                   )}
                 </div>
 

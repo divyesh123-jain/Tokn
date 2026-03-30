@@ -13,6 +13,7 @@ import {
   deleteTokenRemote,
   patchTokenRemote,
 } from "./token-client";
+import { createAutoTokenName, getTokenNameValidationError } from "./token-name";
 import {
   cancelPendingTokenPatch,
   clearWorkspaceTokenPatches,
@@ -101,7 +102,18 @@ export const useTokenStore = create<TokenEditorStore>()(
         set({ selectedId: id, replayKey: get().replayKey + 1 }),
 
       saveTokenName: async (id, name) => {
-        const trimmed = name.trim() || "untitled";
+        const trimmed = name.trim();
+        const validationError = getTokenNameValidationError(trimmed);
+        if (validationError) {
+          toast.error(validationError);
+          throw new Error(validationError);
+        }
+        const conflict = get().tokens.some((t) => t.id !== id && t.name === trimmed);
+        if (conflict) {
+          const message = "Token name already exists";
+          toast.error(message);
+          throw new Error(message);
+        }
         const ws = get().workspaceId;
         if (ws) cancelPendingTokenPatch(ws, id);
         const now = new Date().toISOString();
@@ -195,11 +207,12 @@ export const useTokenStore = create<TokenEditorStore>()(
         const ws = get().workspaceId;
         const nextId = crypto.randomUUID();
         const { id: _sid, ...rest } = source;
+        const duplicateName = createAutoTokenName(source.category, `copy-${Date.now().toString(36).slice(-4)}`);
         if (!ws) {
           const copy: MotionTokenItem = {
             ...rest,
             id: nextId,
-            name: `copy of ${source.name || "untitled"}`,
+            name: duplicateName,
             updatedAt: new Date().toISOString(),
             pendingSync: false,
           };
@@ -219,10 +232,9 @@ export const useTokenStore = create<TokenEditorStore>()(
           return nextId;
         }
         try {
-          const baseName = `copy of ${source.name || "untitled"}`;
           const body = buildCreateTokenBody({
             ...rest,
-            name: `${baseName}-${Date.now().toString(36).slice(-4)}`,
+            name: duplicateName,
           });
           const created = await createTokenRemote(ws, body);
           set((s) => {

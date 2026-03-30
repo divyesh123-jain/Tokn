@@ -16,6 +16,23 @@ export type SessionUserState = {
   emailVerified: boolean;
 };
 
+export type WorkspaceRole = "viewer" | "editor" | "owner";
+
+const WORKSPACE_ROLE_HIERARCHY: Record<WorkspaceRole, number> = {
+  viewer: 0,
+  editor: 1,
+  owner: 2,
+};
+
+export class WorkspaceRoleError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function getSessionUserState(): Promise<SessionUserState> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -69,6 +86,25 @@ export async function getWorkspaceMemberRole(userId: string, workspaceId: string
       ),
     );
   return rows[0]?.role ?? null;
+}
+
+export async function requireWorkspaceRole(
+  userId: string,
+  workspaceId: string,
+  minimumRole: WorkspaceRole,
+) {
+  const role = await getWorkspaceMemberRole(userId, workspaceId);
+  if (!role) {
+    throw new WorkspaceRoleError(403, "Not a workspace member");
+  }
+
+  const memberLevel = WORKSPACE_ROLE_HIERARCHY[role as WorkspaceRole];
+  const requiredLevel = WORKSPACE_ROLE_HIERARCHY[minimumRole];
+  if (memberLevel < requiredLevel) {
+    throw new WorkspaceRoleError(403, `Requires ${minimumRole} role or higher`);
+  }
+
+  return role as WorkspaceRole;
 }
 
 export async function getUserWorkspaces(userId: string) {

@@ -4,20 +4,26 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { motionTokens, workspaces } from "@/db/schema";
-import { getSessionUser, getWorkspaceMemberRole } from "@/lib/auth-helpers";
+import {
+  getSessionUser,
+  requireWorkspaceRole,
+  WorkspaceRoleError,
+} from "@/lib/auth-helpers";
 import { SPRING_DEFAULTS } from "@/lib/motif";
+import { getTokenNameValidationError } from "@/lib/token-name";
 import { motionTokenItemToDbFields, motionTokenDbRowToItem } from "@/lib/token-db";
 
 const tokenCategorySchema = z.enum(["enter", "exit", "spring", "feedback"]);
 
 const tokenNameSchema = z
   .string()
-  .min(1)
-  .max(50)
-  .regex(
-    /^[a-z][a-z0-9._-]*$/,
-    "Name must start with lowercase letter and contain only a-z, 0-9, dots, underscores, and hyphens",
-  );
+  .trim()
+  .superRefine((name, ctx) => {
+    const error = getTokenNameValidationError(name);
+    if (error) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
+    }
+  });
 
 const easingSchema = z
   .enum(["linear", "ease", "ease-in", "ease-out", "ease-in-out"])
@@ -63,9 +69,13 @@ export async function GET(
   }
 
   const workspaceId = parsedWorkspaceId.data;
-  const role = await getWorkspaceMemberRole(user.userId, workspaceId);
-  if (!role) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    await requireWorkspaceRole(user.userId, workspaceId, "viewer");
+  } catch (error) {
+    if (error instanceof WorkspaceRoleError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
   }
 
   const searchParams = req.nextUrl.searchParams;
@@ -166,10 +176,13 @@ export async function POST(
   }
 
   const workspaceId = parsedWorkspaceId.data;
-
-  const memberRole = await getWorkspaceMemberRole(user.userId, workspaceId);
-  if (!memberRole) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    await requireWorkspaceRole(user.userId, workspaceId, "editor");
+  } catch (error) {
+    if (error instanceof WorkspaceRoleError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
   }
 
   const workspaceRows = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId));
@@ -179,7 +192,7 @@ export async function POST(
 
   const payload = tokenCreateSchema.safeParse(await req.json());
   if (!payload.success) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return NextResponse.json({ error: payload.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
   }
 
   const token = payload.data;

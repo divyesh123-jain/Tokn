@@ -4,19 +4,25 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { motionTokens } from "@/db/schema";
-import { getSessionUser, getWorkspaceMemberRole } from "@/lib/auth-helpers";
+import {
+  getSessionUser,
+  requireWorkspaceRole,
+  WorkspaceRoleError,
+} from "@/lib/auth-helpers";
+import { getTokenNameValidationError } from "@/lib/token-name";
 import { motionTokenDbRowToItem, motionTokenItemToDbFields } from "@/lib/token-db";
 
 const tokenCategorySchema = z.enum(["enter", "exit", "spring", "feedback"]);
 
 const tokenNameSchema = z
   .string()
-  .min(1)
-  .max(50)
-  .regex(
-    /^[a-z][a-z0-9._-]*$/,
-    "Name must start with lowercase letter and contain only a-z, 0-9, dots, underscores, and hyphens",
-  );
+  .trim()
+  .superRefine((name, ctx) => {
+    const error = getTokenNameValidationError(name);
+    if (error) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: error });
+    }
+  });
 
 const easingSchema = z
   .enum(["linear", "ease", "ease-in", "ease-out", "ease-in-out"])
@@ -64,15 +70,18 @@ export async function PATCH(
 
   const workspaceId = parsedWorkspaceId.data;
   const tokenId = parsedTokenId.data;
-
-  const memberRole = await getWorkspaceMemberRole(user.userId, workspaceId);
-  if (!memberRole) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    await requireWorkspaceRole(user.userId, workspaceId, "editor");
+  } catch (error) {
+    if (error instanceof WorkspaceRoleError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
   }
 
   const payload = tokenPatchSchema.safeParse(await req.json());
   if (!payload.success) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return NextResponse.json({ error: payload.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
   }
 
   const now = new Date();
@@ -174,10 +183,13 @@ export async function DELETE(
 
   const workspaceId = parsedWorkspaceId.data;
   const tokenId = parsedTokenId.data;
-
-  const memberRole = await getWorkspaceMemberRole(user.userId, workspaceId);
-  if (!memberRole) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    await requireWorkspaceRole(user.userId, workspaceId, "editor");
+  } catch (error) {
+    if (error instanceof WorkspaceRoleError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
   }
 
   const existingRows = await db

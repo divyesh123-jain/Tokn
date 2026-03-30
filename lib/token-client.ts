@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type { MotionTokenItem } from "@/lib/motif";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import { TOKEN_DEFAULTS } from "@/lib/motif";
+import { createAutoTokenName } from "@/lib/token-name";
 
 function tokenToApiBody(t: MotionTokenItem) {
   return {
@@ -26,7 +27,7 @@ export function buildCreateTokenBody(overrides: Partial<MotionTokenItem> = {}): 
   MotionTokenItem,
   "id" | "pendingSync"
 > {
-  return { ...TOKEN_DEFAULTS, name: "untitled", ...overrides };
+  return { ...TOKEN_DEFAULTS, name: createAutoTokenName("enter"), ...overrides };
 }
 
 export async function createTokenRemote(
