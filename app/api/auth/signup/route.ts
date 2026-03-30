@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
 
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { getDb } from "@/db";
@@ -36,14 +35,15 @@ export async function POST(req: Request) {
 
   if (data.session) {
     const email = data.user?.email;
-    if (email) {
+    const userId = data.user?.id;
+    if (email && userId) {
       try {
         const db = getDb();
         const now = new Date();
-        const existingUsers = await db.select().from(users).where(eq(users.email, email));
-        if (existingUsers.length === 0) {
-          await db.insert(users).values({ email, createdAt: now });
-        }
+        await db
+          .insert(users)
+          .values({ id: userId, email, createdAt: now })
+          .onConflictDoNothing({ target: users.email });
       } catch (e) {
         console.error("Postgres user upsert failed (non-blocking)", e);
       }

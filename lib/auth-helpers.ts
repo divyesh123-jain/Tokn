@@ -14,17 +14,17 @@ export async function getSessionUser() {
 
   const db = getDb();
   const now = new Date();
-  const existing = await db.select().from(users).where(eq(users.email, user.email));
-  if (existing.length > 0) {
-    return { userId: existing[0].id, email: user.email };
+  await db
+    .insert(users)
+    .values({ id: user.id, email: user.email, createdAt: now })
+    .onConflictDoNothing({ target: users.email });
+
+  const ensured = await db.select({ id: users.id }).from(users).where(eq(users.email, user.email));
+  if (ensured.length === 0) {
+    return null;
   }
 
-  const inserted = await db
-    .insert(users)
-    .values({ email: user.email, createdAt: now })
-    .returning();
-
-  return { userId: inserted[0].id, email: user.email };
+  return { userId: ensured[0].id, email: user.email };
 }
 
 export async function getWorkspaceMemberRole(userId: string, workspaceId: string) {

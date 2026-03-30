@@ -6,25 +6,42 @@ import { getDb } from "@/db";
 import { motionTokens } from "@/db/schema";
 import { getSessionUser, getWorkspaceMemberRole } from "@/lib/auth-helpers";
 import { motionTokenDbRowToItem, motionTokenItemToDbFields } from "@/lib/token-db";
-import type { MotionTokenDbRow } from "@/lib/token-db";
 
 const tokenCategorySchema = z.enum(["enter", "exit", "spring", "feedback"]);
+
+const tokenNameSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(
+    /^[a-z][a-z0-9._-]*$/,
+    "Name must start with lowercase letter and contain only a-z, 0-9, dots, underscores, and hyphens",
+  );
+
+const easingSchema = z
+  .enum(["linear", "ease", "ease-in", "ease-out", "ease-in-out"])
+  .or(
+    z.string().regex(
+      /^cubic-bezier\(\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*\)$/,
+      "Easing must be a known preset or a valid cubic-bezier()",
+    ),
+  );
 
 const uuidParam = z.string().uuid();
 
 const tokenPatchSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
+  name: tokenNameSchema.optional(),
   category: tokenCategorySchema.optional(),
   durationMs: z.number().int().min(0).max(10_000).optional(),
-  delayMs: z.number().int().min(0).max(10_000).optional(),
-  easing: z.string().min(1).max(200).optional(),
-  yOffset: z.number().int().min(-10_000).max(10_000).optional(),
-  scaleStart: z.number().min(0).max(10).optional(),
+  delayMs: z.number().int().min(0).max(5_000).optional(),
+  easing: easingSchema.optional(),
+  yOffset: z.number().int().min(-1_000).max(1_000).optional(),
+  scaleStart: z.number().min(0.01).max(3).optional(),
   opacityStart: z.number().min(0).max(1).optional(),
   isSpring: z.boolean().optional(),
-  springStiffness: z.number().int().min(1).max(10_000).optional(),
-  springDamping: z.number().int().min(0).max(10_000).optional(),
-  springMass: z.number().min(0).max(10).optional(),
+  springStiffness: z.number().min(1).max(1_000).optional(),
+  springDamping: z.number().min(0.1).max(100).optional(),
+  springMass: z.number().min(0.1).max(20).optional(),
   deprecated: z.boolean().optional(),
 });
 
@@ -139,7 +156,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   context: { params: Promise<{ workspaceId: string; tokenId: string }> },
 ) {
   const user = await getSessionUser();
@@ -163,34 +180,30 @@ export async function DELETE(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const soft = typeof body?.soft === "boolean" ? body.soft : true;
+  const existingRows = await db
+    .select({ id: motionTokens.id, publishedAt: motionTokens.publishedAt })
+    .from(motionTokens)
+    .where(and(eq(motionTokens.id, tokenId), eq(motionTokens.workspaceId, workspaceId)));
 
-  const now = new Date();
-
-  if (soft) {
-    const updated = await db
-      .update(motionTokens)
-      .set({ deprecated: true, updatedAt: now })
-      .where(and(eq(motionTokens.id, tokenId), eq(motionTokens.workspaceId, workspaceId)))
-      .returning();
-
-    if (updated.length === 0) {
-      return NextResponse.json({ error: "Token not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({ token: motionTokenDbRowToItem(updated[0] as MotionTokenDbRow) });
-  }
-
-  const deleted = await db
-    .delete(motionTokens)
-    .where(and(eq(motionTokens.id, tokenId), eq(motionTokens.workspaceId, workspaceId)))
-    .returning();
-
-  if (deleted.length === 0) {
+  if (existingRows.length === 0) {
     return NextResponse.json({ error: "Token not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ token: motionTokenDbRowToItem(deleted[0] as MotionTokenDbRow) });
+  const now = new Date();
+
+  if (existingRows[0].publishedAt) {
+    await db
+      .update(motionTokens)
+      .set({ deprecated: true, updatedAt: now })
+      .where(and(eq(motionTokens.id, tokenId), eq(motionTokens.workspaceId, workspaceId)));
+
+    return NextResponse.json({ deleted: false, deprecated: true });
+  }
+
+  await db
+    .delete(motionTokens)
+    .where(and(eq(motionTokens.id, tokenId), eq(motionTokens.workspaceId, workspaceId)));
+
+  return NextResponse.json({ deleted: true });
 }
 

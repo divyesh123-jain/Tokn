@@ -5,25 +5,44 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { motionTokens, workspaces } from "@/db/schema";
 import { getSessionUser, getWorkspaceMemberRole } from "@/lib/auth-helpers";
+import { SPRING_DEFAULTS } from "@/lib/motif";
 import { motionTokenItemToDbFields, motionTokenDbRowToItem } from "@/lib/token-db";
 
 const tokenCategorySchema = z.enum(["enter", "exit", "spring", "feedback"]);
 
+const tokenNameSchema = z
+  .string()
+  .min(1)
+  .max(50)
+  .regex(
+    /^[a-z][a-z0-9._-]*$/,
+    "Name must start with lowercase letter and contain only a-z, 0-9, dots, underscores, and hyphens",
+  );
+
+const easingSchema = z
+  .enum(["linear", "ease", "ease-in", "ease-out", "ease-in-out"])
+  .or(
+    z.string().regex(
+      /^cubic-bezier\(\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*\)$/,
+      "Easing must be a known preset or a valid cubic-bezier()",
+    ),
+  );
+
 const uuidParam = z.string().uuid();
 
 const tokenCreateSchema = z.object({
-  name: z.string().min(1).max(200),
+  name: tokenNameSchema,
   category: tokenCategorySchema,
   durationMs: z.number().int().min(0).max(10_000),
-  delayMs: z.number().int().min(0).max(10_000),
-  easing: z.string().min(1).max(200),
-  yOffset: z.number().int().min(-10_000).max(10_000),
-  scaleStart: z.number().min(0).max(10),
+  delayMs: z.number().int().min(0).max(5_000),
+  easing: easingSchema,
+  yOffset: z.number().int().min(-1_000).max(1_000),
+  scaleStart: z.number().min(0.01).max(3),
   opacityStart: z.number().min(0).max(1),
   isSpring: z.boolean(),
-  springStiffness: z.number().int().min(1).max(10_000),
-  springDamping: z.number().int().min(0).max(10_000),
-  springMass: z.number().min(0).max(10),
+  springStiffness: z.number().min(1).max(1_000).optional(),
+  springDamping: z.number().min(0.1).max(100).optional(),
+  springMass: z.number().min(0.1).max(20).optional(),
   deprecated: z.boolean().optional(),
 });
 
@@ -115,9 +134,9 @@ export async function POST(
     scaleStart: token.scaleStart,
     opacityStart: token.opacityStart,
     isSpring: token.isSpring,
-    springStiffness: token.springStiffness,
-    springDamping: token.springDamping,
-    springMass: token.springMass,
+    springStiffness: token.springStiffness ?? SPRING_DEFAULTS.springStiffness,
+    springDamping: token.springDamping ?? SPRING_DEFAULTS.springDamping,
+    springMass: token.springMass ?? SPRING_DEFAULTS.springMass,
     deprecated: token.deprecated ?? false,
   });
 

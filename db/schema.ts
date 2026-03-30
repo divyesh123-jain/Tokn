@@ -1,4 +1,4 @@
-import { boolean, integer, timestamp, uuid, varchar, pgTable, unique, pgEnum } from "drizzle-orm/pg-core";
+import { boolean, integer, timestamp, uuid, varchar, text, pgTable, unique, pgEnum } from "drizzle-orm/pg-core";
 
 export const workspaceMemberRoleEnum = pgEnum('workspace_member_role', [
   'owner',
@@ -65,6 +65,8 @@ export const motionTokens = pgTable(
     springStiffness: integer("spring_stiffness").notNull(),
     springDamping: integer("spring_damping").notNull(),
     springMass: integer("spring_mass").notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    publishedVersion: text("published_version"),
     deprecated: boolean("deprecated").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
