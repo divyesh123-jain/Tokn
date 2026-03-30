@@ -26,6 +26,7 @@ import {
 } from "@/lib/motif";
 import { getTokenNameValidationError } from "@/lib/token-name";
 import { useSelectedToken, useTokenStore } from "@/lib/token-store";
+import { deleteTokenAction, saveTokenNameAction } from "@/lib/token-actions";
 import { transformToken } from "@/lib/codegen";
 import { buildWorkspacePreviewSlug } from "@/lib/workspace-slug";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
@@ -71,8 +72,6 @@ export function TokenLibrary() {
     selectedId,
     selectToken,
     updateToken,
-    saveTokenName,
-    deleteToken,
   } = useTokenStore();
   const selectedToken = useSelectedToken();
   const [nameDraft, setNameDraft] = useState("");
@@ -354,7 +353,7 @@ export function TokenLibrary() {
                             if (nameValidationError) return;
                             setNameSaving(true);
                             try {
-                              await saveTokenName(selectedToken.id, nameDraft);
+                              await saveTokenNameAction(selectedToken.id, nameDraft);
                               toast.success("Name saved");
                             } finally {
                               setNameSaving(false);
@@ -373,7 +372,7 @@ export function TokenLibrary() {
                           if (!selectedToken || nameConflict || nameValidationError) return;
                           setNameSaving(true);
                           try {
-                            await saveTokenName(selectedToken.id, nameDraft);
+                            await saveTokenNameAction(selectedToken.id, nameDraft);
                             toast.success("Name saved");
                           } finally {
                             setNameSaving(false);
@@ -505,7 +504,7 @@ export function TokenLibrary() {
                   <Button
                     variant="outline"
                     className="w-full text-red-600"
-                    onClick={() => void deleteToken(selectedToken.id)}
+                    onClick={() => void deleteTokenAction(selectedToken.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     Delete token

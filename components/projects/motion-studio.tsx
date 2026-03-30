@@ -38,6 +38,13 @@ import {
   type PreviewComponent,
   type CodeFormat,
 } from "@/lib/token-store";
+import {
+  createTokenAction,
+  deleteTokenAction,
+  duplicateTokenAction,
+  saveTokenNameAction,
+  softDeleteTokenAction,
+} from "@/lib/token-actions";
 import { transformToken } from "@/lib/codegen";
 
 const EASING_MAP: Record<string, [number, number, number, number]> = {
@@ -140,17 +147,13 @@ function TokenListPanel() {
   const {
     tokens,
     selectedId,
+    workspaceRole,
     searchQuery,
     setSearch,
     selectToken,
-    createToken,
-    updateToken,
-    saveTokenName,
-    duplicateToken,
-    deleteToken,
-    softDeleteToken,
     hasPublishedUsage,
   } = useTokenStore();
+  const canEditTokens = workspaceRole === "owner" || workspaceRole === "editor";
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
   const [inlineName, setInlineName] = useState("");
@@ -171,6 +174,14 @@ function TokenListPanel() {
       .filter((g) => g.items.length > 0);
   }, [filtered]);
 
+  const activeTokenCount = useMemo(
+    () => tokens.filter((token) => !token.deprecated).length,
+    [tokens],
+  );
+  const tokenLimit = 20;
+  const nearLimit = activeTokenCount >= 17;
+  const tokenLimitReached = activeTokenCount >= tokenLimit;
+
   useEffect(() => {
     if (editingTokenId && inlineInputRef.current) {
       inlineInputRef.current.focus();
@@ -179,19 +190,21 @@ function TokenListPanel() {
   }, [editingTokenId]);
 
   function startRename(tokenId: string, currentName: string) {
+    if (!canEditTokens) return;
     setDeleteConfirmId(null);
     setEditingTokenId(tokenId);
     setInlineName(currentName);
   }
 
   function submitRename() {
+    if (!canEditTokens) return;
     if (!editingTokenId) return;
     const next = inlineName.trim() || "untitled";
     if (tokens.some((t) => t.id !== editingTokenId && t.name === next)) {
       toast.error("That name is already taken");
       return;
     }
-    void saveTokenName(editingTokenId, inlineName);
+    void saveTokenNameAction(editingTokenId, inlineName);
     setEditingTokenId(null);
     setInlineName("");
   }
@@ -202,15 +215,17 @@ function TokenListPanel() {
   }
 
   function requestDelete(tokenId: string) {
+    if (!canEditTokens) return;
     setEditingTokenId(null);
     setDeleteConfirmId(tokenId);
   }
 
   function confirmDelete(tokenId: string) {
+    if (!canEditTokens) return;
     if (hasPublishedUsage(tokenId)) {
-      void softDeleteToken(tokenId);
+      void softDeleteTokenAction(tokenId);
     } else {
-      void deleteToken(tokenId);
+      void deleteTokenAction(tokenId);
     }
     setDeleteConfirmId(null);
   }
@@ -225,6 +240,11 @@ function TokenListPanel() {
           <span className="text-sm font-semibold text-foreground">Tokn</span>
           <span className="text-[10px] text-muted-foreground">v1.0</span>
         </div>
+        {nearLimit ? (
+          <p className="mb-2 text-[10px] text-muted-foreground">
+            {activeTokenCount}/{tokenLimit} tokens used
+          </p>
+        ) : null}
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -250,7 +270,7 @@ function TokenListPanel() {
               const cfg = categoryConfig[token.category];
               const isHovered = hoveredId === token.id;
               const isEditing = editingTokenId === token.id;
-              const showMenu = sel || isHovered;
+              const showMenu = canEditTokens && (sel || isHovered);
               const showDeleteConfirm = deleteConfirmId === token.id;
               return (
                 <div
@@ -319,48 +339,50 @@ function TokenListPanel() {
                         </button>
                       )}
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={(event) => event.stopPropagation()}
-                            className={cn(
-                              "h-6 w-6 rounded-md text-[#888780] hover:bg-muted",
-                              showMenu ? "opacity-100" : "opacity-0",
-                            )}
+                    {canEditTokens ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(event) => event.stopPropagation()}
+                              className={cn(
+                                "h-6 w-6 rounded-md text-[#888780] hover:bg-muted",
+                                showMenu ? "opacity-100" : "opacity-0",
+                              )}
+                            >
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenuContent align="end" sideOffset={6} className="w-40">
+                          <DropdownMenuItem
+                            onClick={() => void duplicateTokenAction(token.id)}
+                            className="text-xs"
                           >
-                            <MoreHorizontal className="h-3.5 w-3.5" />
-                          </Button>
-                        }
-                      />
-                      <DropdownMenuContent align="end" sideOffset={6} className="w-40">
-                        <DropdownMenuItem
-                          onClick={() => void duplicateToken(token.id)}
-                          className="text-xs"
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                          Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => startRename(token.id, token.name)}
-                          className="text-xs"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => requestDelete(token.id)}
-                          variant="destructive"
-                          className="text-xs"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            <Copy className="h-3.5 w-3.5" />
+                            Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => startRename(token.id, token.name)}
+                            className="text-xs"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => requestDelete(token.id)}
+                            variant="destructive"
+                            className="text-xs"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
                   </div>
                   {showDeleteConfirm && (
                     <div className="mt-1 rounded-lg border border-border bg-popover p-2 text-xs shadow-md">
@@ -394,17 +416,31 @@ function TokenListPanel() {
         ))}
       </nav>
 
-      <div className="border-t border-border p-3">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => void createToken()}
-          className="flex h-auto w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs font-normal text-muted-foreground hover:border-primary/40 hover:bg-transparent hover:text-foreground"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          New token
-        </Button>
-      </div>
+      {canEditTokens ? (
+        <div className="border-t border-border p-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              if (tokenLimitReached) return;
+              void createTokenAction();
+            }}
+            disabled={tokenLimitReached}
+            title={
+              tokenLimitReached
+                ? "Token limit reached. Upgrade to Solo for unlimited tokens."
+                : undefined
+            }
+            className={cn(
+              "flex h-auto w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border py-2 text-xs font-normal text-muted-foreground hover:border-primary/40 hover:bg-transparent hover:text-foreground",
+              tokenLimitReached && "cursor-not-allowed opacity-50 hover:border-border hover:text-muted-foreground",
+            )}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New token
+          </Button>
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -562,11 +598,10 @@ function PreviewComponent({ type }: { type: PreviewComponent }) {
 function PropertiesPanel() {
   const {
     tokens,
+    workspaceRole,
     updateToken,
-    saveTokenName,
     codeFormat,
     setCodeFormat,
-    duplicateToken,
     nameFocusTargetId,
     nameFocusSelectAll,
     clearNameFocusRequest,
@@ -577,6 +612,7 @@ function PropertiesPanel() {
   const [nameDraft, setNameDraft] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const canEditTokens = workspaceRole === "owner" || workspaceRole === "editor";
 
   useEffect(() => {
     if (token) setNameDraft(token.name);
@@ -620,14 +656,16 @@ function PropertiesPanel() {
   }
 
   function update(patch: Partial<MotionTokenItem>) {
+    if (!canEditTokens) return;
     updateToken(token!.id, patch);
   }
 
   async function commitTokenName() {
+    if (!canEditTokens) return;
     if (!token || nameConflict) return;
     setNameSaving(true);
     try {
-      await saveTokenName(token.id, nameDraft);
+      await saveTokenNameAction(token.id, nameDraft);
       toast.success("Name saved");
     } finally {
       setNameSaving(false);
@@ -665,7 +703,8 @@ function PropertiesPanel() {
               variant="ghost"
               size="icon"
               title="Duplicate this token."
-              onClick={() => void duplicateToken(token.id)}
+              onClick={() => void duplicateTokenAction(token.id)}
+              disabled={!canEditTokens}
               className="h-6 w-6 rounded-md text-[#888780] hover:bg-muted"
             >
               <Copy className="h-3.5 w-3.5" />
@@ -678,12 +717,14 @@ function PropertiesPanel() {
                 value={nameDraft}
                 onChange={(e) => setNameDraft(e.target.value)}
                 onKeyDown={(e) => {
+                  if (!canEditTokens) return;
                   if (e.key === "Enter") {
                     e.preventDefault();
                     void commitTokenName();
                   }
                 }}
                 placeholder="enter.default"
+                disabled={!canEditTokens}
                 className={cn(
                   "h-auto rounded-lg border bg-background px-2.5 py-1.5 pr-8 font-mono text-xs focus-visible:ring-2 focus-visible:ring-ring",
                   nameConflict ? "border-red-400" : "border-border",
@@ -697,7 +738,7 @@ function PropertiesPanel() {
               type="button"
               size="sm"
               className="h-9 shrink-0 px-3 text-xs"
-              disabled={!nameDirty || nameConflict || nameSaving}
+              disabled={!canEditTokens || !nameDirty || nameConflict || nameSaving}
               onClick={() => void commitTokenName()}
             >
               {nameSaving ? "…" : "Save"}
@@ -731,6 +772,7 @@ function PropertiesPanel() {
           </label>
           <Select
             value={token.category}
+            disabled={!canEditTokens}
             onValueChange={(v) =>
               update({ category: v as MotionTokenCategory })
             }
@@ -756,6 +798,7 @@ function PropertiesPanel() {
             type="button"
             variant="ghost"
             onClick={() => update({ isSpring: !token.isSpring })}
+            disabled={!canEditTokens}
             className={cn(
               "relative h-[18px] w-8 shrink-0 rounded-full p-0 hover:bg-transparent",
               token.isSpring ? "bg-primary" : "bg-muted",
@@ -780,6 +823,7 @@ function PropertiesPanel() {
               step={1}
               onChange={(v) => update({ springStiffness: v })}
               onBlur={handleBlur}
+              disabled={!canEditTokens}
             />
             <Slider
               label="Damping"
@@ -789,6 +833,7 @@ function PropertiesPanel() {
               step={1}
               onChange={(v) => update({ springDamping: v })}
               onBlur={handleBlur}
+              disabled={!canEditTokens}
             />
             <Slider
               label="Mass"
@@ -799,6 +844,7 @@ function PropertiesPanel() {
               suffix=""
               onChange={(v) => update({ springMass: v })}
               onBlur={handleBlur}
+              disabled={!canEditTokens}
             />
           </div>
         ) : (
@@ -812,6 +858,7 @@ function PropertiesPanel() {
               suffix="ms"
               onChange={(v) => update({ durationMs: v })}
               onBlur={handleBlur}
+              disabled={!canEditTokens}
             />
             <Slider
               label="Delay"
@@ -822,6 +869,7 @@ function PropertiesPanel() {
               suffix="ms"
               onChange={(v) => update({ delayMs: v })}
               onBlur={handleBlur}
+              disabled={!canEditTokens}
             />
           </div>
         )}
@@ -836,6 +884,7 @@ function PropertiesPanel() {
             suffix="px"
             onChange={(v) => update({ yOffset: v })}
             onBlur={handleBlur}
+            disabled={!canEditTokens}
           />
           <Slider
             label="Scale"
@@ -845,6 +894,7 @@ function PropertiesPanel() {
             step={0.01}
             onChange={(v) => update({ scaleStart: v })}
             onBlur={handleBlur}
+            disabled={!canEditTokens}
           />
           <Slider
             label="Opacity"
@@ -854,6 +904,7 @@ function PropertiesPanel() {
             step={0.1}
             onChange={(v) => update({ opacityStart: v })}
             onBlur={handleBlur}
+            disabled={!canEditTokens}
           />
         </div>
 
@@ -869,6 +920,7 @@ function PropertiesPanel() {
                   type="button"
                   variant="ghost"
                   onClick={() => update({ easing: preset })}
+                  disabled={!canEditTokens}
                   className={cn(
                     "h-auto rounded-lg px-2 py-1.5 text-[11px] font-medium",
                     token.easing === preset
@@ -886,6 +938,7 @@ function PropertiesPanel() {
               }
               onChange={(e) => update({ easing: e.target.value })}
               onBlur={handleBlur}
+              disabled={!canEditTokens}
               placeholder="cubic-bezier(0.4, 0, 0.2, 1)"
               className="mt-2 h-auto rounded-lg border border-border bg-background px-2.5 py-1.5 font-mono text-[10px] placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
@@ -921,6 +974,17 @@ function PropertiesPanel() {
       </div>
 
       <div className="border-t border-border p-4">
+        {canEditTokens ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => void deleteTokenAction(token.id)}
+            className="mb-2 flex h-auto w-full items-center justify-center gap-1.5 rounded-lg border border-border py-2.5 text-xs font-medium text-red-600 hover:bg-red-50 hover:text-red-700"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete token
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="ghost"
@@ -953,6 +1017,7 @@ function Slider({
   suffix,
   onChange,
   onBlur,
+  disabled,
 }: {
   label: string;
   value: number;
@@ -962,6 +1027,7 @@ function Slider({
   suffix?: string;
   onChange: (v: number) => void;
   onBlur?: () => void;
+  disabled?: boolean;
 }) {
   const display =
     step < 1 ? value.toFixed(step < 0.1 ? 2 : 1) : String(value);
@@ -982,6 +1048,7 @@ function Slider({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         onPointerUp={onBlur}
+        disabled={disabled}
         className="w-full"
       />
     </div>

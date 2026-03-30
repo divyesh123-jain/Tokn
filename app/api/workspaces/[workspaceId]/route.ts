@@ -4,7 +4,12 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { workspaces } from "@/db/schema";
-import { getSessionUser, getWorkspaceMemberRole } from "@/lib/auth-helpers";
+import {
+  getSessionUser,
+  getWorkspaceMemberRole,
+  requireWorkspaceRole,
+  WorkspaceRoleError,
+} from "@/lib/auth-helpers";
 import { buildWorkspacePreviewSlug } from "@/lib/workspace-slug";
 
 const uuidParam = z.string().uuid();
@@ -102,9 +107,13 @@ export async function PATCH(
   }
 
   const workspaceId = parsed.data;
-  const role = await getWorkspaceMemberRole(user.userId, workspaceId);
-  if (!role) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  try {
+    await requireWorkspaceRole(user.userId, workspaceId, "owner");
+  } catch (error) {
+    if (error instanceof WorkspaceRoleError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
   }
 
   const body = patchWorkspaceSchema.safeParse(await req.json());
@@ -192,7 +201,7 @@ export async function PATCH(
       slug: w.slug || buildWorkspacePreviewSlug(w.name, w.id),
       kind: w.kind,
       createdAt: w.createdAt.toISOString(),
-      role,
+      role: "owner",
     },
   });
 }

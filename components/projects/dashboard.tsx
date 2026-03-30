@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Share2 } from "lucide-react";
+import { ArrowLeft, Loader2, Settings, Share2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { MotionStudio } from "@/components/projects/motion-studio";
@@ -39,6 +39,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
   const [publishing, setPublishing] = React.useState(false);
   const tokensHydrating = useTokenStore((s) => s.tokensHydrating);
   const tokens = useTokenStore((s) => s.tokens);
+  const canPublish = workspace?.role === "owner";
 
   const publishState = React.useMemo(() => {
     const active = tokens.filter((t) => !t.deprecated);
@@ -111,6 +112,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
     async function run() {
       useTokenStore.setState({
         workspaceId: projectId,
+        workspaceRole: null,
         tokensHydrating: true,
         tokens: [],
         selectedId: null,
@@ -148,6 +150,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
       }
 
       const ws = wJson.workspace;
+      useTokenStore.getState().setWorkspaceContext(projectId, ws.role);
       useTokenStore.getState().replaceTokens(tJson.tokens, tJson.tokens[0]?.id ?? null);
       setWorkspace(ws);
     }
@@ -189,7 +192,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
   }
 
   async function publishWorkspace() {
-    if (!workspace || publishing) return;
+    if (!workspace || publishing || workspace.role !== "owner") return;
     setPublishing(true);
     try {
       const body =
@@ -253,13 +256,18 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
           <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent-foreground">
             {workspace.kind === "team" ? "Team" : "Individual"}
           </span>
+          <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
+            {workspace.role}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          {publishState.hasPublished && !publishState.isDirty ? (
+          {publishState.hasPublished && (!canPublish || !publishState.isDirty) ? (
             <div className="hidden rounded-md border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground sm:inline-flex">
-              Published {publishState.currentVersion} {publishedDateLabel ? `· ${publishedDateLabel}` : ""}
+              Published {publishState.currentVersion}
+              {publishedDateLabel ? ` · ${publishedDateLabel}` : ""}
+              {!canPublish && publishState.isDirty ? " · pending updates" : ""}
             </div>
-          ) : (
+          ) : canPublish ? (
             <Button
               variant="default"
               size="sm"
@@ -276,7 +284,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
             >
               {publishState.hasPublished ? "Publish changes" : "Publish"}
             </Button>
-          )}
+          ) : null}
           <Button
             variant="outline"
             size="sm"
@@ -288,6 +296,20 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
             <Share2 className="h-3.5 w-3.5" />
             Share
           </Button>
+          <Link
+            href={`/settings?workspaceId=${workspace.id}`}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "hidden gap-1.5 sm:inline-flex",
+            )}
+          >
+            {workspace.kind === "team" ? (
+              <Users className="h-3.5 w-3.5" />
+            ) : (
+              <Settings className="h-3.5 w-3.5" />
+            )}
+            {workspace.kind === "team" ? "Team" : "Settings"}
+          </Link>
           <ThemePicker variant="compact" />
         </div>
       </header>
@@ -295,7 +317,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
         <MotionStudio embedded />
       </div>
 
-      <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
+      <Dialog open={publishOpen && canPublish} onOpenChange={setPublishOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Publish Motion System</DialogTitle>

@@ -2,7 +2,7 @@ export const TOKEN_NAME_REGEX = /^[a-z][a-z0-9]*\.[a-z][a-z0-9-]*$/;
 
 export const TOKEN_NAME_MAX_LENGTH = 49;
 
-const RESERVED_TOKEN_SEGMENTS = new Set(["undefined", "null", "default"]);
+const RESERVED_TOKEN_SEGMENTS = new Set(["undefined", "null"]);
 
 export const TOKEN_NAME_FORMAT_ERROR =
   "Token names must follow the format: category.descriptor (e.g. enter.default)";

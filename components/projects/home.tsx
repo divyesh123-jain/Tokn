@@ -384,6 +384,7 @@ export function ProjectsHome() {
                     scheduleRouterAction(() => router.push(`/projects/${p.id}`))
                   }
                   onDelete={() => void deleteWorkspace(p.id)}
+                  canDelete={p.role === "owner"}
                 />
               ))}
               <button
@@ -504,10 +505,12 @@ function ProjectCard({
   project,
   onOpen,
   onDelete,
+  canDelete,
 }: {
   project: WorkspaceSummary;
   onOpen: () => void;
   onDelete: () => void;
+  canDelete: boolean;
 }) {
   const tone =
     project.kind === "team"
@@ -541,33 +544,35 @@ function ProjectCard({
             motion · library
           </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="relative z-10 h-8 w-8 text-muted-foreground opacity-0 transition hover:bg-muted group-hover:opacity-100"
-                onClick={(e) => e.stopPropagation()}
+        {canDelete ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="relative z-10 h-8 w-8 text-muted-foreground opacity-0 transition hover:bg-muted group-hover:opacity-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
               >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete project
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete project
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
       </div>
     </div>
   );
