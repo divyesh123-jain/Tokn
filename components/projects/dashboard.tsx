@@ -34,12 +34,80 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [workspace, setWorkspace] = React.useState<WorkspaceSummary | null>(null);
   const [publishOpen, setPublishOpen] = React.useState(false);
+  const [publishMode, setPublishMode] = React.useState<"existing" | "new">("new");
   const [version, setVersion] = React.useState("1.0.0");
   const [publishing, setPublishing] = React.useState(false);
   const tokensHydrating = useTokenStore((s) => s.tokensHydrating);
+  const tokens = useTokenStore((s) => s.tokens);
+
+  const publishState = React.useMemo(() => {
+    const active = tokens.filter((t) => !t.deprecated);
+    if (active.length === 0) {
+      return {
+        hasPublished: false,
+        isDirty: false,
+        currentVersion: null as string | null,
+        publishedAtIso: null as string | null,
+      };
+    }
+
+    const published = active.filter((t) => t.publishedVersion && t.publishedAt);
+    if (published.length === 0) {
+      return {
+        hasPublished: false,
+        isDirty: true,
+        currentVersion: null as string | null,
+        publishedAtIso: null as string | null,
+      };
+    }
+
+    const latest = [...published].sort((a, b) => {
+      const aMs = new Date(a.publishedAt as string).getTime();
+      const bMs = new Date(b.publishedAt as string).getTime();
+      return bMs - aMs;
+    })[0];
+
+    const currentVersion = latest.publishedVersion as string;
+    const publishedAtIso = latest.publishedAt as string;
+    const publishedAtMs = new Date(publishedAtIso).getTime();
+
+    const isDirty = active.some((token) => {
+      if (!token.publishedAt || !token.publishedVersion) return true;
+      if (token.publishedVersion !== currentVersion) return true;
+      const updatedMs = new Date(token.updatedAt ?? token.publishedAt).getTime();
+      if (Number.isNaN(updatedMs)) return true;
+      return updatedMs > publishedAtMs;
+    });
+
+    return {
+      hasPublished: true,
+      isDirty,
+      currentVersion,
+      publishedAtIso,
+    };
+  }, [tokens]);
+
+  const publishedDateLabel = React.useMemo(() => {
+    if (!publishState.publishedAtIso) return "";
+    return new Intl.DateTimeFormat("en", {
+      month: "short",
+      day: "numeric",
+    }).format(new Date(publishState.publishedAtIso));
+  }, [publishState.publishedAtIso]);
 
   React.useEffect(() => {
     let cancelled = false;
+
+    async function safeJson<T>(res: Response): Promise<T | null> {
+      const text = await res.text().catch(() => "");
+      if (!text) return null;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        return null;
+      }
+    }
+
     async function run() {
       useTokenStore.setState({
         workspaceId: projectId,
@@ -64,12 +132,21 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
         scheduleRouterAction(() => router.replace("/projects"));
         return;
       }
-      const wJson = (await wRes.json()) as { workspace?: WorkspaceSummary };
-      const tJson = (await tRes.json()) as { tokens: MotionTokenItem[] };
-      if (!wJson.workspace) {
+
+      if (!wRes.ok || !tRes.ok) {
+        toast.error("Could not load project. Please refresh and try again.");
         scheduleRouterAction(() => router.replace("/projects"));
         return;
       }
+
+      const wJson = await safeJson<{ workspace?: WorkspaceSummary }>(wRes);
+      const tJson = await safeJson<{ tokens?: MotionTokenItem[] }>(tRes);
+      if (!wJson?.workspace || !Array.isArray(tJson?.tokens)) {
+        toast.error("Could not load project data.");
+        scheduleRouterAction(() => router.replace("/projects"));
+        return;
+      }
+
       const ws = wJson.workspace;
       useTokenStore.getState().replaceTokens(tJson.tokens, tJson.tokens[0]?.id ?? null);
       setWorkspace(ws);
@@ -105,7 +182,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
     if (!workspace) return;
     const base =
       typeof window !== "undefined" ? window.location.origin : "https://tokn.so";
-    const slug = buildWorkspacePreviewSlug(workspace.name, workspace.id);
+    const slug = workspace.slug || buildWorkspacePreviewSlug(workspace.name, workspace.id);
     const url = `${base}/preview/${slug}`;
     await navigator.clipboard.writeText(url);
     toast.success("Public preview URL copied");
@@ -115,23 +192,42 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
     if (!workspace || publishing) return;
     setPublishing(true);
     try {
+      const body =
+        publishMode === "existing"
+          ? { mode: "existing" as const }
+          : { mode: "new" as const, version };
+
       const res = await fetch(`/api/workspaces/${workspace.id}/publish`, {
         ...workspaceApiFetchInit,
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ version }),
+        body: JSON.stringify(body),
       });
       const json = (await res.json().catch(() => null)) as
-        | { publishedVersion?: string; error?: string }
+        | { publishedVersion?: string; publishedAt?: string; error?: string }
         | null;
-      if (!res.ok || !json?.publishedVersion) {
+      if (!res.ok || !json?.publishedVersion || !json.publishedAt) {
         toast.error(json?.error ?? "Could not publish this workspace");
         return;
       }
 
+      useTokenStore.setState((state) => ({
+        tokens: state.tokens.map((token) =>
+          token.deprecated
+            ? token
+            : {
+                ...token,
+                pendingSync: false,
+                publishedVersion: json.publishedVersion,
+                publishedAt: json.publishedAt,
+                updatedAt: json.publishedAt,
+              },
+        ),
+      }));
+
       const base =
         typeof window !== "undefined" ? window.location.origin : "https://tokn.so";
-      const slug = buildWorkspacePreviewSlug(workspace.name, workspace.id);
+      const slug = workspace.slug || buildWorkspacePreviewSlug(workspace.name, workspace.id);
       const pinnedUrl = `${base}/preview/${slug}/v/${encodeURIComponent(json.publishedVersion)}`;
       await navigator.clipboard.writeText(pinnedUrl);
       toast.success(`Published ${json.publishedVersion}. Pinned URL copied.`);
@@ -159,14 +255,28 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="default"
-            size="sm"
-            className="hidden gap-1.5 sm:inline-flex"
-            onClick={() => setPublishOpen(true)}
-          >
-            Publish
-          </Button>
+          {publishState.hasPublished && !publishState.isDirty ? (
+            <div className="hidden rounded-md border border-border bg-muted px-2.5 py-1 text-xs font-medium text-foreground sm:inline-flex">
+              Published {publishState.currentVersion} {publishedDateLabel ? `· ${publishedDateLabel}` : ""}
+            </div>
+          ) : (
+            <Button
+              variant="default"
+              size="sm"
+              className="hidden gap-1.5 sm:inline-flex"
+              onClick={() => {
+                setPublishMode(
+                  publishState.hasPublished && publishState.currentVersion ? "existing" : "new",
+                );
+                if (publishState.currentVersion) {
+                  setVersion(publishState.currentVersion.replace(/^v/, ""));
+                }
+                setPublishOpen(true);
+              }}
+            >
+              {publishState.hasPublished ? "Publish changes" : "Publish"}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -191,16 +301,45 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
             <DialogTitle>Publish Motion System</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="publish-version">Version</Label>
-            <Input
-              id="publish-version"
-              value={version}
-              onChange={(e) => setVersion(e.target.value)}
-              placeholder="1.2.0"
-            />
+          <div className="space-y-3">
+            {publishState.hasPublished && publishState.currentVersion ? (
+              <div className="space-y-2">
+                <Label>Publish target</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={publishMode === "existing" ? "default" : "outline"}
+                    onClick={() => setPublishMode("existing")}
+                  >
+                    Update {publishState.currentVersion}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={publishMode === "new" ? "default" : "outline"}
+                    onClick={() => setPublishMode("new")}
+                  >
+                    Create new version
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {publishMode === "new" ? (
+              <div className="space-y-2">
+                <Label htmlFor="publish-version">Version</Label>
+                <Input
+                  id="publish-version"
+                  value={version}
+                  onChange={(e) => setVersion(e.target.value)}
+                  placeholder="1.2.0"
+                />
+              </div>
+            ) : null}
+
             <p className="text-xs text-muted-foreground">
-              Publishing sets the public version badge and enables pinned preview URLs.
+              Publishing updates public preview metadata and copies the pinned preview URL.
             </p>
           </div>
 

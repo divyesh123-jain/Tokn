@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
@@ -11,12 +11,20 @@ import {
 } from "@/lib/auth-helpers";
 
 const uuidParam = z.string().uuid();
-const publishSchema = z.object({
-  version: z
-    .string()
-    .trim()
-    .regex(/^v?\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$/, "Version must look like 1.2.0"),
-});
+const versionSchema = z
+  .string()
+  .trim()
+  .regex(/^v?\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$/, "Version must look like 1.2.0");
+
+const publishSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("existing"),
+  }),
+  z.object({
+    mode: z.literal("new"),
+    version: versionSchema,
+  }),
+]);
 
 export async function POST(
   req: Request,
@@ -53,9 +61,38 @@ export async function POST(
 
   const db = getDb();
   const now = new Date();
-  const version = payload.data.version.startsWith("v")
-    ? payload.data.version
-    : `v${payload.data.version}`;
+  let version = "";
+  if (payload.data.mode === "new") {
+    version = payload.data.version.startsWith("v")
+      ? payload.data.version
+      : `v${payload.data.version}`;
+  } else {
+    const latest = await db
+      .select({
+        publishedVersion: motionTokens.publishedVersion,
+        publishedAt: motionTokens.publishedAt,
+      })
+      .from(motionTokens)
+      .where(
+        and(
+          eq(motionTokens.workspaceId, workspaceId),
+          eq(motionTokens.deprecated, false),
+          isNotNull(motionTokens.publishedAt),
+          isNotNull(motionTokens.publishedVersion),
+        ),
+      )
+      .orderBy(desc(motionTokens.publishedAt))
+      .limit(1);
+
+    const current = latest[0]?.publishedVersion?.trim();
+    if (!current) {
+      return NextResponse.json(
+        { error: "No published version exists yet. Create a new version first." },
+        { status: 400 },
+      );
+    }
+    version = current;
+  }
 
   const updated = await db
     .update(motionTokens)

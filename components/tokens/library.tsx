@@ -142,11 +142,11 @@ export function TokenLibrary() {
     if (workspaceId) {
       const workspaceRes = await fetch(`/api/workspaces/${workspaceId}`, workspaceApiFetchInit);
       const workspaceJson = (await workspaceRes.json().catch(() => null)) as
-        | { workspace?: { id: string; name: string } }
+        | { workspace?: { id: string; name: string; slug?: string } }
         | null;
       const workspace = workspaceJson?.workspace;
       if (workspace) {
-        const slug = buildWorkspacePreviewSlug(workspace.name, workspace.id);
+        const slug = workspace.slug || buildWorkspacePreviewSlug(workspace.name, workspace.id);
         url = `${base}/preview/${slug}`;
       }
     }

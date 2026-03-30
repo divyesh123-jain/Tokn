@@ -7,6 +7,7 @@ import { motionTokenDbRowToItem } from "@/lib/token-db";
 import {
   buildWorkspacePreviewSlug,
   parseWorkspacePreviewSlug,
+  sanitizeWorkspaceSlug,
   workspaceNameToSlug,
 } from "@/lib/workspace-slug";
 
@@ -20,6 +21,11 @@ type PublicPreviewPayload = {
   tokens: MotionTokenItem[];
 };
 
+function isMissingSlugColumnError(error: unknown) {
+  const e = error as { code?: string; cause?: { code?: string } };
+  return e?.code === "42703" || e?.cause?.code === "42703";
+}
+
 export async function getPublicPreviewPayload({
   workspaceSlug,
   version,
@@ -28,24 +34,56 @@ export async function getPublicPreviewPayload({
   version?: string;
 }): Promise<PublicPreviewPayload | null> {
   const db = getDb();
+  const normalizedIncomingSlug = sanitizeWorkspaceSlug(workspaceSlug);
   const parsed = parseWorkspacePreviewSlug(workspaceSlug);
 
-  if (!parsed.workspaceIdPrefix) return null;
+  let exactWorkspaceRows: Array<{ id: string; name: string; slug?: string }> = [];
+  try {
+    exactWorkspaceRows = await db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        slug: workspaces.slug,
+      })
+      .from(workspaces)
+      .where(eq(workspaces.slug, normalizedIncomingSlug))
+      .limit(1);
+  } catch (error) {
+    if (!isMissingSlugColumnError(error)) throw error;
+  }
 
-  const workspaceRows = await db
-    .select({
-      id: workspaces.id,
-      name: workspaces.name,
-    })
-    .from(workspaces)
-    .where(sql`left(${workspaces.id}::text, 8) = ${parsed.workspaceIdPrefix}`)
-    .limit(1);
+  let workspace = exactWorkspaceRows[0];
 
-  const workspace = workspaceRows[0];
-  if (!workspace) return null;
+  if (!workspace) {
+    if (!parsed.workspaceIdPrefix) return null;
+    let workspaceRows: Array<{ id: string; name: string; slug?: string }> = [];
+    try {
+      workspaceRows = await db
+        .select({
+          id: workspaces.id,
+          name: workspaces.name,
+          slug: workspaces.slug,
+        })
+        .from(workspaces)
+        .where(sql`left(${workspaces.id}::text, 8) = ${parsed.workspaceIdPrefix}`)
+        .limit(1);
+    } catch (error) {
+      if (!isMissingSlugColumnError(error)) throw error;
+      workspaceRows = await db
+        .select({
+          id: workspaces.id,
+          name: workspaces.name,
+        })
+        .from(workspaces)
+        .where(sql`left(${workspaces.id}::text, 8) = ${parsed.workspaceIdPrefix}`)
+        .limit(1);
+    }
+    workspace = workspaceRows[0];
+    if (!workspace) return null;
 
-  if (workspaceNameToSlug(workspace.name) !== parsed.nameSlug) {
-    return null;
+    if (workspaceNameToSlug(workspace.name) !== parsed.nameSlug) {
+      return null;
+    }
   }
 
   const rows = await db
@@ -87,7 +125,7 @@ export async function getPublicPreviewPayload({
     return {
       workspaceId: workspace.id,
       workspaceName: workspace.name,
-      workspaceSlug: buildWorkspacePreviewSlug(workspace.name, workspace.id),
+      workspaceSlug: workspace.slug || buildWorkspacePreviewSlug(workspace.name, workspace.id),
       version: "live",
       publishedAtIso: new Date(latestMs).toISOString(),
       isLiveDraft: true,
@@ -118,7 +156,7 @@ export async function getPublicPreviewPayload({
   return {
     workspaceId: workspace.id,
     workspaceName: workspace.name,
-    workspaceSlug: buildWorkspacePreviewSlug(workspace.name, workspace.id),
+    workspaceSlug: workspace.slug || buildWorkspacePreviewSlug(workspace.name, workspace.id),
     version: selectedVersion,
     publishedAtIso: new Date(publishedAtMs).toISOString(),
     isLiveDraft: false,

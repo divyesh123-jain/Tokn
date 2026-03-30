@@ -19,10 +19,12 @@ export type MotionTokenDbRow = {
   springStiffness: number;
   springDamping: number;
   springMass: number;
+  publishedAt?: Date | string | null;
+  publishedVersion?: string | null;
   deprecated: boolean;
 };
 
-function toUpdatedAtIso(v: Date | string | undefined): string | undefined {
+function toUpdatedAtIso(v: Date | string | null | undefined): string | undefined {
   if (v == null) return undefined;
   if (v instanceof Date) return v.toISOString();
   const d = new Date(v);
@@ -30,7 +32,7 @@ function toUpdatedAtIso(v: Date | string | undefined): string | undefined {
 }
 
 export function motionTokenDbRowToItem(
-  row: MotionTokenDbRow & { updatedAt?: Date | string },
+  row: MotionTokenDbRow & { updatedAt?: Date | string | null },
 ): MotionTokenItem {
   return {
     id: row.id,
@@ -49,12 +51,17 @@ export function motionTokenDbRowToItem(
     springMass: row.springMass / SPRING_MASS_FACTOR,
     deprecated: row.deprecated,
     updatedAt: toUpdatedAtIso(row.updatedAt),
+    publishedAt: toUpdatedAtIso(row.publishedAt),
+    publishedVersion: row.publishedVersion ?? undefined,
   };
 }
 
 export function motionTokenItemToDbFields(
-  item: Omit<MotionTokenItem, "id" | "pendingSync" | "updatedAt">,
-): Omit<MotionTokenDbRow, "id" | "workspaceId"> {
+  item: Omit<
+    MotionTokenItem,
+    "id" | "pendingSync" | "updatedAt" | "publishedAt" | "publishedVersion"
+  >,
+): Omit<MotionTokenDbRow, "id" | "workspaceId" | "publishedAt" | "publishedVersion"> {
   return {
     name: item.name,
     category: item.category,

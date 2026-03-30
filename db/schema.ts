@@ -23,9 +23,13 @@ export const workspaces = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: varchar("name", { length: 200 }).notNull(),
+    slug: varchar("slug", { length: 120 }).notNull(),
     kind: varchar("kind", { length: 20 }).notNull().default("individual"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
+  (t) => [
+    unique("workspaces_slug_unique").on(t.slug),
+  ],
 );
 
 export const workspaceMembers = pgTable(

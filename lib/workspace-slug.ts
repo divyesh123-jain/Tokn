@@ -1,6 +1,6 @@
 const WORKSPACE_ID_PREFIX_LENGTH = 8;
 
-function normalizeSlug(input: string) {
+export function sanitizeWorkspaceSlug(input: string) {
   return input
     .toLowerCase()
     .trim()
@@ -10,7 +10,7 @@ function normalizeSlug(input: string) {
 }
 
 export function workspaceNameToSlug(name: string) {
-  const base = normalizeSlug(name);
+  const base = sanitizeWorkspaceSlug(name);
   return base || "workspace";
 }
 

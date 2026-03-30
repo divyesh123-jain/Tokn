@@ -37,6 +37,10 @@ export type MotionTokenItem = {
   deprecated: boolean;
   /** ISO 8601 from DB or client when the token last changed */
   updatedAt?: string;
+  /** ISO 8601 from DB when token was last published */
+  publishedAt?: string;
+  /** Published semantic version tag, for example v1.2.0 */
+  publishedVersion?: string;
 };
 
 export const SPRING_DEFAULTS = {
