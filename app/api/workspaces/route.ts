@@ -1,27 +1,21 @@
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
 import { motionTokens, workspaceMembers, workspaces } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth-helpers";
-import { initialMotionTokens } from "@/lib/motif";
 import { motionTokenItemToDbFields } from "@/lib/token-db";
-
-const DEFAULT_TOKEN_NAMES = [
-  "enter.fast",
-  "enter.default",
-  "enter.slow",
-  "exit.fast",
-  "exit.default",
-  "spring.bouncy",
-  "spring.gentle",
-  "feedback.success",
-];
+import {
+  MOTION_PRESETS,
+  seedDefaultWorkspaceTokens,
+  type MotionPreset,
+} from "@/lib/workspace-presets";
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(1).max(200),
   kind: z.enum(["individual", "team"]),
+  preset: z.enum(MOTION_PRESETS).optional(),
 });
 
 export async function GET() {
@@ -67,12 +61,33 @@ export async function POST(req: Request) {
   }
 
   const { name, kind } = parsed.data;
+  const trimmedName = name.trim();
+  const preset: MotionPreset = parsed.data.preset ?? "minimal";
   const db = getDb();
   const now = new Date();
 
+  const existing = await db
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+    .where(
+      and(
+        eq(workspaceMembers.userId, user.userId),
+        sql`lower(${workspaces.name}) = ${trimmedName.toLowerCase()}`,
+      ),
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return NextResponse.json(
+      { error: "Workspace with this name already exists" },
+      { status: 409 },
+    );
+  }
+
   const insertedWorkspaces = await db
     .insert(workspaces)
-    .values({ name, kind, createdAt: now })
+    .values({ name: trimmedName, kind, createdAt: now })
     .returning();
 
   const workspaceId = insertedWorkspaces[0].id;
@@ -84,14 +99,12 @@ export async function POST(req: Request) {
     createdAt: now,
   });
 
-  const defaultTokens = initialMotionTokens.filter((t) => DEFAULT_TOKEN_NAMES.includes(t.name));
-  const tokenRows = defaultTokens.map((t) => {
-    const { id: _id, ...rest } = t;
+  const tokenRows = seedDefaultWorkspaceTokens(preset).map((token) => {
     return {
       workspaceId,
       createdAt: now,
       updatedAt: now,
-      ...motionTokenItemToDbFields(rest),
+      ...motionTokenItemToDbFields(token),
     };
   });
 
@@ -100,7 +113,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     workspace: {
       id: workspaceId,
-      name,
+      name: trimmedName,
       kind,
       createdAt: now.toISOString(),
       role: "owner",

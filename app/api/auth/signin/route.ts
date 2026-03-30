@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { getDb } from "@/db";
-import { users } from "@/db/schema";
+import { users, workspaceMembers } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 const signinSchema = z.object({
   email: z.string().email(),
@@ -25,11 +26,20 @@ export async function POST(req: Request) {
   });
 
   if (error) {
+    if (error.message.toLowerCase().includes("email not confirmed")) {
+      const verifyPath = `/signup/verify?email=${encodeURIComponent(email)}`;
+      return NextResponse.json({ ok: true, redirectTo: verifyPath });
+    }
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
   if (!data.session) {
     return NextResponse.json({ error: "No active session" }, { status: 401 });
+  }
+
+  if (!data.user?.email_confirmed_at) {
+    const verifyPath = `/signup/verify?email=${encodeURIComponent(email)}`;
+    return NextResponse.json({ ok: true, redirectTo: verifyPath });
   }
 
   const userEmail = data.user?.email;
@@ -47,6 +57,18 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, redirectTo: "/projects" });
+  if (!userId) {
+    return NextResponse.json({ ok: true, redirectTo: "/projects" });
+  }
+
+  const pg = getDb();
+  const workspaceRows = await pg
+    .select({ workspaceId: workspaceMembers.workspaceId })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.userId, userId))
+    .limit(1);
+
+  const redirectTo = workspaceRows.length === 0 ? "/onboarding?step=1" : "/projects";
+  return NextResponse.json({ ok: true, redirectTo });
 }
 

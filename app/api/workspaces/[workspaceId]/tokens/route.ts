@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
@@ -68,16 +68,85 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const rows = await db
-    .select()
-    .from(motionTokens)
-    .where(eq(motionTokens.workspaceId, workspaceId));
+  const searchParams = req.nextUrl.searchParams;
 
-  const tokens = rows.map((r) =>
+  const rawLimit = searchParams.get("limit");
+  const parsedLimit = z.coerce.number().int().min(1).max(100).safeParse(rawLimit ?? "50");
+  if (!parsedLimit.success) {
+    return NextResponse.json({ error: "Invalid limit" }, { status: 400 });
+  }
+  const limit = parsedLimit.data;
+
+  const rawCursor = searchParams.get("cursor");
+  let cursor: string | null = null;
+  if (rawCursor) {
+    const parsedCursor = uuidParam.safeParse(rawCursor);
+    if (!parsedCursor.success) {
+      return NextResponse.json({ error: "Invalid cursor" }, { status: 400 });
+    }
+    cursor = parsedCursor.data;
+  }
+
+  const rawCategory = searchParams.get("category");
+  let category: z.infer<typeof tokenCategorySchema> | null = null;
+  if (rawCategory) {
+    const parsedCategory = tokenCategorySchema.safeParse(rawCategory);
+    if (!parsedCategory.success) {
+      return NextResponse.json({ error: "Invalid category" }, { status: 400 });
+    }
+    category = parsedCategory.data;
+  }
+
+  const totalWhere = category
+    ? and(eq(motionTokens.workspaceId, workspaceId), eq(motionTokens.category, category))
+    : eq(motionTokens.workspaceId, workspaceId);
+
+  const totalRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(motionTokens)
+    .where(totalWhere);
+  const total = Number(totalRows[0]?.count ?? 0);
+
+  const shouldPaginate = Boolean(cursor) || searchParams.has("limit") || total > 50;
+
+  const tokenWhere = cursor
+    ? and(
+        eq(motionTokens.workspaceId, workspaceId),
+        category ? eq(motionTokens.category, category) : undefined,
+        gt(motionTokens.id, cursor),
+      )
+    : category
+      ? and(eq(motionTokens.workspaceId, workspaceId), eq(motionTokens.category, category))
+      : eq(motionTokens.workspaceId, workspaceId);
+
+  const rows = shouldPaginate
+    ? await db
+        .select()
+        .from(motionTokens)
+        .where(tokenWhere)
+        .orderBy(asc(motionTokens.id))
+        .limit(limit + 1)
+    : await db
+        .select()
+        .from(motionTokens)
+        .where(tokenWhere)
+        .orderBy(asc(motionTokens.id));
+
+  const hasMore = shouldPaginate ? rows.length > limit : false;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
+  const tokens = pageRows.map((r) =>
     motionTokenDbRowToItem(r as unknown as { workspaceId: string; id: string } & typeof r),
   );
 
-  return NextResponse.json({ tokens });
+  const nextCursor = hasMore ? pageRows[pageRows.length - 1]?.id ?? null : null;
+
+  return NextResponse.json({
+    tokens,
+    nextCursor,
+    hasMore,
+    total,
+  });
 }
 
 export async function POST(

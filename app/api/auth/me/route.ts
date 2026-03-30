@@ -23,6 +23,7 @@ export async function GET() {
       id: user.id,
       email: user.email ?? "",
       fullName: fullName || null,
+      emailVerified: Boolean(user.email_confirmed_at),
     },
   });
 }

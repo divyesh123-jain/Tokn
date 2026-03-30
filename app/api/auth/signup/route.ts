@@ -5,6 +5,36 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
 
+function getAppOrigin(req: Request): string {
+  const configured =
+    process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL;
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+
+  const forwardedHost = req.headers.get("x-forwarded-host");
+  const host = forwardedHost ?? req.headers.get("host");
+  const forwardedProto = req.headers.get("x-forwarded-proto");
+  if (host) {
+    const proto = forwardedProto ?? (host.includes("localhost") ? "http" : "https");
+    return `${proto}://${host}`;
+  }
+
+  return new URL(req.url).origin;
+}
+
+function mapSignupError(message: string) {
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("already registered") ||
+    normalized.includes("already exists") ||
+    normalized.includes("user already")
+  ) {
+    return "Email already exists. Please sign in.";
+  }
+  return message;
+}
+
 const signupSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   email: z.string().email(),
@@ -13,6 +43,7 @@ const signupSchema = z.object({
 
 export async function POST(req: Request) {
   const db = await createSupabaseServerClient();
+  const origin = getAppOrigin(req);
 
   const parsed = signupSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -26,11 +57,13 @@ export async function POST(req: Request) {
     password,
     options: {
       data: name ? { full_name: name } : {},
+      emailRedirectTo: `${origin}/api/auth/callback?flow=signup`,
     },
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    const mappedMessage = mapSignupError(error.message);
+    return NextResponse.json({ error: mappedMessage }, { status: 400 });
   }
 
   if (data.session) {
@@ -48,10 +81,11 @@ export async function POST(req: Request) {
         console.error("Postgres user upsert failed (non-blocking)", e);
       }
     }
-    await db.auth.signOut();
-    return NextResponse.json({ ok: true, redirectTo: "/signin?signup=1" });
+    return NextResponse.json({ ok: true, redirectTo: "/onboarding?step=1" });
   }
 
-  return NextResponse.json({ ok: true, redirectTo: "/signin?verify=1&signup=1" });
+  const verifyUrl = new URL("/signup/verify", req.url);
+  verifyUrl.searchParams.set("email", email);
+  return NextResponse.json({ ok: true, redirectTo: verifyUrl.pathname + verifyUrl.search });
 }
 
