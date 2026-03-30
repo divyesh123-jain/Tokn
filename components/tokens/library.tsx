@@ -27,6 +27,8 @@ import {
 import { getTokenNameValidationError } from "@/lib/token-name";
 import { useSelectedToken, useTokenStore } from "@/lib/token-store";
 import { transformToken } from "@/lib/codegen";
+import { buildWorkspacePreviewSlug } from "@/lib/workspace-slug";
+import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 
 const EASING_MAP: Record<string, [number, number, number, number]> = {
   "ease-out": [0, 0, 0.58, 1],
@@ -135,7 +137,19 @@ export function TokenLibrary() {
   async function shareLibrary() {
     const base =
       typeof window !== "undefined" ? window.location.origin : "https://tokn.app";
-    const url = `${base}/preview?view=token-library`;
+    const workspaceId = useTokenStore.getState().workspaceId;
+    let url = `${base}/preview`;
+    if (workspaceId) {
+      const workspaceRes = await fetch(`/api/workspaces/${workspaceId}`, workspaceApiFetchInit);
+      const workspaceJson = (await workspaceRes.json().catch(() => null)) as
+        | { workspace?: { id: string; name: string } }
+        | null;
+      const workspace = workspaceJson?.workspace;
+      if (workspace) {
+        const slug = buildWorkspacePreviewSlug(workspace.name, workspace.id);
+        url = `${base}/preview/${slug}`;
+      }
+    }
     await navigator.clipboard.writeText(url);
     setShared(true);
     window.setTimeout(() => setShared(false), 1500);
