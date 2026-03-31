@@ -10,7 +10,7 @@ function LogoMark() {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-[#F8F8F6] text-[#1a1a2e]">
+    <div className="min-h-screen bg-background text-foreground">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-8">
         <div className="flex items-center gap-3">
           <LogoMark />
@@ -18,7 +18,7 @@ export default function TermsPage() {
         </div>
         <Link
           href="/signin"
-          className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+          className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
         >
           Sign in
         </Link>

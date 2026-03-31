@@ -12,9 +12,9 @@ function LogoMark() {
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="min-h-screen bg-[#F8F8F6] text-[#1a1a2e]">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex max-w-5xl flex-col items-center justify-center px-6 py-14">
-        <div className="w-full max-w-[460px] rounded-2xl bg-white p-8 shadow-sm">
+        <div className="w-full max-w-[460px] rounded-2xl bg-card p-8 shadow-sm">
           <div className="flex items-start justify-center">
             <LogoMark />
           </div>
@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
               <input
                 type="email"
                 placeholder="name@studio.com"
-                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm shadow-none outline-none transition focus-visible:ring-2 focus-visible:ring-[#534AB7]/40"
+                className="h-11 w-full rounded-xl border border-border bg-background px-4 text-sm shadow-none outline-none transition focus-visible:ring-2 focus-visible:ring-primary/40"
                 required
               />
             </div>
@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
           </form>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            <Link href="/signin" className="font-semibold text-[#534AB7] hover:underline">
+            <Link href="/signin" className="font-semibold text-primary hover:underline">
               Back to sign in
             </Link>
           </div>

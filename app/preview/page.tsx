@@ -88,19 +88,19 @@ function PreviewComponentCard({ type }: { type: PreviewComponent }) {
       );
     case "card":
       return (
-        <div className="w-56 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <div className="mb-3 h-20 rounded-lg bg-gray-50" />
-          <p className="text-sm font-medium text-gray-900">Welcome back</p>
-          <p className="mt-1 text-xs text-gray-500">Dashboard is ready</p>
+        <div className="w-56 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-3 h-20 rounded-lg bg-muted" />
+          <p className="text-sm font-medium text-foreground">Welcome back</p>
+          <p className="mt-1 text-xs text-muted-foreground">Dashboard is ready</p>
         </div>
       );
     case "modal":
       return (
-        <div className="w-64 rounded-xl bg-white p-5 shadow-xl ring-1 ring-gray-100">
-          <h4 className="font-semibold text-gray-900">Confirm action</h4>
-          <p className="mt-2 text-xs text-gray-500">This action cannot be undone.</p>
+        <div className="w-64 rounded-xl bg-card p-5 shadow-xl ring-1 ring-border">
+          <h4 className="font-semibold text-foreground">Confirm action</h4>
+          <p className="mt-2 text-xs text-muted-foreground">This action cannot be undone.</p>
           <div className="mt-4 flex gap-2">
-            <span className="flex-1 rounded-lg border border-gray-200 py-2 text-center text-xs text-gray-600">
+            <span className="flex-1 rounded-lg border border-border py-2 text-center text-xs text-muted-foreground">
               Cancel
             </span>
             <span className="flex-1 rounded-lg bg-[#534AB7] py-2 text-center text-xs text-white">
@@ -111,18 +111,18 @@ function PreviewComponentCard({ type }: { type: PreviewComponent }) {
       );
     case "toast":
       return (
-        <div className="flex items-center gap-2.5 rounded-lg bg-gray-900 px-4 py-3 shadow-lg">
+        <div className="flex items-center gap-2.5 rounded-lg bg-foreground px-4 py-3 shadow-lg">
           <div className="h-4 w-4 rounded-full bg-green-400" />
-          <span className="text-sm text-white">Changes saved</span>
+          <span className="text-sm text-background">Changes saved</span>
         </div>
       );
     case "list":
       return (
-        <div className="flex w-56 items-center gap-3 rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+        <div className="flex w-56 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
           <div className="h-9 w-9 rounded-full bg-[#EEEDFE]" />
           <div>
-            <p className="text-sm font-medium text-gray-900">Design review</p>
-            <p className="text-[10px] text-gray-400">Updated 2h ago</p>
+            <p className="text-sm font-medium text-foreground">Design review</p>
+            <p className="text-[10px] text-muted-foreground">Updated 2h ago</p>
           </div>
         </div>
       );
@@ -169,7 +169,7 @@ export default function PreviewPage() {
                 onClick={() => setPreviewComponent(item.component)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                   previewComponent === item.component
-                    ? "bg-[#EEEDFE] text-[#3C3489]"
+                    ? "bg-accent text-accent-foreground"
                     : "bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -187,7 +187,7 @@ export default function PreviewPage() {
             </button>
           </div>
 
-          <div className="mt-4 flex min-h-[260px] items-center justify-center rounded-xl bg-[#F1EFE8] p-6">
+          <div className="mt-4 flex min-h-[260px] items-center justify-center rounded-xl bg-muted/50 p-6">
             <motion.div
               key={`${replayKey}-${previewComponent}`}
               initial={{

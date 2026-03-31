@@ -186,21 +186,21 @@ export function SectionPanel({ section }: { section: StudioSection }) {
 
   if (section === "manifest") {
     return (
-      <main className="flex min-w-0 flex-1 flex-col bg-[#f7f7f5]">
-        <div className="border-b border-[#dfded8] px-6 py-5">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8b8a83]">Manifest</p>
-          <h1 className="mt-1 text-[30px] font-semibold tracking-tight text-[#151515]">Workspace Manifest</h1>
+      <main className="flex min-w-0 flex-1 flex-col bg-muted/30">
+        <div className="border-b border-border px-6 py-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Manifest</p>
+          <h1 className="mt-1 text-[30px] font-semibold tracking-tight text-foreground">Workspace Manifest</h1>
         </div>
         <div className="min-h-0 flex-1 p-6">
-          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#ddddd7] bg-white p-4">
+          <div className="flex h-full min-h-0 flex-col rounded-xl border border-border bg-card p-4">
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-semibold text-[#2f257f]">Exportable Token Manifest</p>
-              <Button type="button" variant="ghost" onClick={copyManifest} className="h-8 border border-[#dddcd7] px-3 text-xs">
+              <p className="text-xs font-semibold text-primary">Exportable Token Manifest</p>
+              <Button type="button" variant="ghost" onClick={copyManifest} className="h-8 border border-border px-3 text-xs">
                 <Copy className="mr-1.5 h-3.5 w-3.5" />
                 Copy
               </Button>
             </div>
-            <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-[#131718] p-4 text-[12px] leading-6 text-[#e6e8e8]">
+            <pre className="min-h-0 flex-1 overflow-auto rounded-lg bg-foreground p-4 text-[12px] leading-6 text-background">
               <code>{manifestJson}</code>
             </pre>
           </div>
@@ -211,27 +211,27 @@ export function SectionPanel({ section }: { section: StudioSection }) {
 
   if (section === "library") {
     return (
-      <main className="flex min-w-0 flex-1 flex-col bg-[#f7f7f5]">
-        <div className="border-b border-[#dfded8] px-6 py-4">
-          <div className="mb-5 flex items-center justify-between gap-3 rounded-xl bg-[#121212] px-4 py-3 text-white">
+      <main className="flex min-w-0 flex-1 flex-col bg-muted/30">
+        <div className="border-b border-border px-6 py-4">
+          <div className="mb-5 flex items-center justify-between gap-3 rounded-xl bg-card px-4 py-3 text-foreground">
             <div className="flex items-center gap-4">
               <p className="text-sm font-semibold">{librarySelection.length} tokens selected</p>
-              <span className="hidden text-[10px] uppercase tracking-[0.12em] text-white/60 md:inline">active scope</span>
-              <Badge className="h-5 rounded-md border-0 bg-white/10 px-2 py-0 font-mono text-[10px] text-white">global.css</Badge>
+              <span className="hidden text-[10px] uppercase tracking-[0.12em] text-foreground/60 md:inline">active scope</span>
+              <Badge className="h-5 rounded-md border-0 bg-accent px-2 py-0 font-mono text-[10px] text-accent-foreground">global.css</Badge>
             </div>
             <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => setLibrarySelection([])}
-                className="h-8 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-white hover:bg-white/10 hover:text-white"
+                className="h-8 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground hover:bg-muted hover:text-foreground"
               >
                 Clear
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                className="h-8 rounded-md border border-white/15 bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#171717] hover:bg-white/90"
+                className="h-8 rounded-md border border-border bg-background px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground hover:bg-muted"
                 onClick={() => {
                   void duplicateSelection();
                 }}
@@ -242,7 +242,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
               <Button
                 type="button"
                 variant="ghost"
-                className="h-8 rounded-md border border-white/15 bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#171717] hover:bg-white/90"
+                className="h-8 rounded-md border border-border bg-background px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground hover:bg-muted"
                 onClick={() => {
                   void deleteSelection();
                 }}
@@ -265,24 +265,24 @@ export function SectionPanel({ section }: { section: StudioSection }) {
 
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-[42px] font-semibold italic leading-none tracking-tight text-[#151515]">Standard Library</h1>
-              <p className="mt-2 text-[13px] text-[#636158]">System-defined motion primitives for the Core UI framework.</p>
-              <p className="text-[13px] text-[#636158]">Precise, calibrated, and production-ready.</p>
+              <h1 className="text-[42px] font-semibold italic leading-none tracking-tight text-foreground">Standard Library</h1>
+              <p className="mt-2 text-[13px] text-muted-foreground">System-defined motion primitives for the Core UI framework.</p>
+              <p className="text-[13px] text-muted-foreground">Precise, calibrated, and production-ready.</p>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative transition-all duration-200">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8f8d84] transition-colors duration-200" />
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground transition-colors duration-200" />
                 <Input
                   value={searchQuery}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search tokens..."
-                  className="h-9 w-55 rounded-md border-[#d6d4cd] bg-white py-1 pl-8 pr-2 text-xs shadow-none transition-all duration-200 focus:border-[#4c3dc9] focus:ring-1 focus:ring-[#4c3dc9]/20"
+                  className="h-9 w-55 rounded-md border-border bg-card py-1 pl-8 pr-2 text-xs shadow-none transition-all duration-200 focus:border-primary focus:ring-1 focus:ring-primary/20"
                 />
               </div>
-              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-md border border-[#dddcd7] bg-white text-[#6b685f]">
+              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-md border border-border bg-card text-muted-foreground">
                 <SlidersHorizontal className="h-4 w-4" />
               </Button>
-              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-md border border-[#dddcd7] bg-white text-[#6b685f]">
+              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-md border border-border bg-card text-muted-foreground">
                 <LayoutGrid className="h-4 w-4" />
               </Button>
             </div>
@@ -315,10 +315,10 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                   onMouseEnter={() => setLibraryHoveredId(item.id)}
                   onMouseLeave={() => setLibraryHoveredId((current) => (current === item.id ? null : current))}
                   className={cn(
-                    "relative flex cursor-pointer flex-col gap-8 rounded-lg border bg-white p-8 text-left transition-all duration-200",
+                    "relative flex cursor-pointer flex-col gap-8 rounded-lg border bg-card p-8 text-left transition-all duration-200",
                     selected
-                      ? "border-[#4c3dc9] shadow-[0_8px_32px_-8px_rgba(76,61,201,0.15)]"
-                      : "border-[rgba(200,196,213,0.15)] hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)]",
+                      ? "border-primary shadow-[0_8px_32px_-8px_rgba(76,61,201,0.15)]"
+                      : "border-border hover:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)]",
                   )}
                 >
                   <div className="absolute right-4 top-4 flex items-center gap-1.5">
@@ -331,7 +331,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                               variant="ghost"
                               size="icon"
                               onClick={(event) => event.stopPropagation()}
-                              className="h-7 w-7 rounded-md border border-[#d7d5ce] bg-white text-[#666359] hover:bg-[#f3f2ed]"
+                              className="h-7 w-7 rounded-md border border-border bg-background text-muted-foreground hover:bg-muted"
                             >
                               <MoreHorizontal className="h-3.5 w-3.5" />
                             </Button>
@@ -368,19 +368,14 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : null}
-                    <div
-                      className={cn(
-                        "flex h-5 w-5 items-center justify-center rounded border-2 transition-all duration-200",
-                        selected
-                          ? "border-[#4c3dc9] bg-[#4c3dc9]"
-                          : "border-[#c8c4d5] bg-white hover:border-[#4c3dc9]",
-                      )}
-                    >
-                      {selected && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-                    </div>
+                    {selected ? (
+                      <div className="flex h-5 w-5 items-center justify-center rounded border-2 border-primary bg-primary transition-all duration-200">
+                        <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />
+                      </div>
+                    ) : null}
                   </div>
 
-                  <div className="flex h-40 items-center justify-center overflow-hidden rounded-lg bg-[#f4f4f2]">
+                  <div className="flex h-40 items-center justify-center overflow-hidden rounded-lg bg-muted/40">
                     <motion.div
                       key={`${item.id}-${hovered ? "run" : "rest"}`}
                       initial={{ opacity: item.opacityStart, y: item.yOffset, scale: item.scaleStart }}
@@ -415,7 +410,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
 
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-sm font-bold text-[#1a1c1b]">{item.name}</p>
+                      <p className="truncate font-mono text-sm font-bold text-foreground">{item.name}</p>
                     </div>
                     <Badge
                       className="h-5 shrink-0 border-0 px-2 py-0 text-[9px] font-bold uppercase tracking-[0.9px]"
@@ -425,9 +420,9 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                     </Badge>
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 text-[11px] text-[#787584]">
+                  <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-[#787584]" />
+                      <div className="h-3 w-3 rounded-full bg-muted-foreground" />
                       <span>
                         {item.isSpring
                           ? `Stiff: ${item.springStiffness}`
@@ -435,7 +430,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="h-3 w-3 rounded-full bg-[#787584]" />
+                      <div className="h-3 w-3 rounded-full bg-muted-foreground" />
                       <span>{item.isSpring ? "Spring" : item.easing}</span>
                     </div>
                   </div>
@@ -450,7 +445,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
               onClick={() => {
                 void createTokenAction();
               }}
-              className="fixed bottom-6 right-6 h-12 w-12 rounded-full bg-[#171717] p-0 text-white shadow-lg hover:bg-[#2a2a2a]"
+              className="fixed bottom-6 right-6 h-12 w-12 rounded-full bg-foreground p-0 text-background shadow-lg hover:bg-foreground/90"
             >
               <Plus className="h-5 w-5" />
             </Button>
@@ -498,7 +493,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                 )}
               >
                 <div className={cn("flex h-4 w-4 items-center justify-center rounded border", selected ? "border-primary bg-primary" : "border-border bg-background")}>
-                  {selected ? <Check className="h-3 w-3 text-white" /> : null}
+                  {selected ? <Check className="h-3 w-3 text-primary-foreground" /> : null}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-mono text-[11px] font-semibold text-foreground">{item.name}</p>
@@ -553,7 +548,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                   step={5}
                   value={durationOffsetPercent}
                   onChange={(event) => setDurationOffsetPercent(Number(event.target.value))}
-                  className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#dbe2d8] accent-[#236a56]"
+                  className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                 />
               </div>
 
@@ -589,7 +584,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                       setDurationOverrideMs(Number.isFinite(parsed) ? parsed : 300);
                       setDurationOffsetPercent(0);
                     }}
-                    className="h-7 w-23 border-[#d3d8cb] bg-[#f8f9f5] px-2 text-xs"
+                    className="h-7 w-23 border-border bg-background px-2 text-xs"
                   />
                   <Button
                     type="button"
@@ -604,7 +599,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
             </div>
 
             {inspectorSelectedTokens.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[#ccd2c5] bg-[#f8f9f5] p-8 text-center text-sm text-[#637061]">
+              <div className="rounded-xl border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
                 Select tokens from the left panel to start editing.
               </div>
             ) : (
@@ -612,18 +607,18 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                 {inspectorSelectedTokens.map((item) => {
                   const easingNormalized = normalizeEasing(item.easing);
                   return (
-                    <article key={item.id} className="rounded-xl border border-[#d7d9cf] bg-white p-4">
+                    <article key={item.id} className="rounded-xl border border-border bg-card p-4">
                       <div className="mb-3 flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-mono text-sm font-semibold text-[#1e241f]">{item.name}</p>
-                          <p className="mt-0.5 text-[11px] text-[#687266]">{item.category} • {item.pendingSync ? "pending sync" : "live"}</p>
+                          <p className="font-mono text-sm font-semibold text-foreground">{item.name}</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{item.category} • {item.pendingSync ? "pending sync" : "live"}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
                             type="button"
                             variant="ghost"
                             onClick={() => selectToken(item.id)}
-                            className="h-7 rounded-md border border-[#d3d8cb] bg-[#f8f9f5] px-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#495248]"
+                            className="h-7 rounded-md border border-border bg-background px-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-foreground"
                           >
                             Focus
                           </Button>
@@ -636,7 +631,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
 
                       <div className="space-y-2">
                         <div>
-                          <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-[#717a6f]"><span>Duration</span><span>{item.durationMs}ms</span></div>
+                          <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"><span>Duration</span><span>{item.durationMs}ms</span></div>
                           <input
                             type="range"
                             min={0}
@@ -644,12 +639,12 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                             step={10}
                             value={item.durationMs}
                             onChange={(event) => canEditTokens && updateToken(item.id, { durationMs: Number(event.target.value) })}
-                            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#dbe2d8] accent-[#236a56]"
+                            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                           />
                         </div>
 
                         <div>
-                          <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-[#717a6f]"><span>Delay</span><span>{item.delayMs}ms</span></div>
+                          <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"><span>Delay</span><span>{item.delayMs}ms</span></div>
                           <input
                             type="range"
                             min={0}
@@ -657,12 +652,12 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                             step={10}
                             value={item.delayMs}
                             onChange={(event) => canEditTokens && updateToken(item.id, { delayMs: Number(event.target.value) })}
-                            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#dbe2d8] accent-[#236a56]"
+                            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                           />
                         </div>
 
                         <div>
-                          <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-[#717a6f]"><span>Y Offset</span><span>{item.yOffset}px</span></div>
+                          <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"><span>Y Offset</span><span>{item.yOffset}px</span></div>
                           <input
                             type="range"
                             min={-120}
@@ -670,13 +665,13 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                             step={1}
                             value={item.yOffset}
                             onChange={(event) => canEditTokens && updateToken(item.id, { yOffset: Number(event.target.value) })}
-                            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#dbe2d8] accent-[#236a56]"
+                            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                           />
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-[#717a6f]"><span>Scale</span><span>{item.scaleStart.toFixed(2)}</span></div>
+                            <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"><span>Scale</span><span>{item.scaleStart.toFixed(2)}</span></div>
                             <input
                               type="range"
                               min={0.5}
@@ -684,11 +679,11 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                               step={0.01}
                               value={item.scaleStart}
                               onChange={(event) => canEditTokens && updateToken(item.id, { scaleStart: Number(event.target.value) })}
-                              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#dbe2d8] accent-[#236a56]"
+                              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                             />
                           </div>
                           <div>
-                            <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-[#717a6f]"><span>Opacity</span><span>{item.opacityStart.toFixed(2)}</span></div>
+                            <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-muted-foreground"><span>Opacity</span><span>{item.opacityStart.toFixed(2)}</span></div>
                             <input
                               type="range"
                               min={0}
@@ -696,7 +691,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                               step={0.05}
                               value={item.opacityStart}
                               onChange={(event) => canEditTokens && updateToken(item.id, { opacityStart: Number(event.target.value) })}
-                              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-[#dbe2d8] accent-[#236a56]"
+                              className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                             />
                           </div>
                         </div>
@@ -709,7 +704,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                               max={500}
                               value={item.springStiffness}
                               onChange={(event) => canEditTokens && updateToken(item.id, { springStiffness: Number(event.target.value) })}
-                              className="h-8 border-[#d3d8cb] bg-[#f8f9f5] px-2 text-xs"
+                              className="h-8 border-border bg-background px-2 text-xs"
                             />
                             <Input
                               type="number"
@@ -717,7 +712,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                               max={100}
                               value={item.springDamping}
                               onChange={(event) => canEditTokens && updateToken(item.id, { springDamping: Number(event.target.value) })}
-                              className="h-8 border-[#d3d8cb] bg-[#f8f9f5] px-2 text-xs"
+                              className="h-8 border-border bg-background px-2 text-xs"
                             />
                             <Input
                               type="number"
@@ -726,12 +721,12 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                               step={0.1}
                               value={item.springMass}
                               onChange={(event) => canEditTokens && updateToken(item.id, { springMass: Number(event.target.value) })}
-                              className="h-8 border-[#d3d8cb] bg-[#f8f9f5] px-2 text-xs"
+                              className="h-8 border-border bg-background px-2 text-xs"
                             />
                           </div>
                         ) : (
                           <div>
-                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[#717a6f]">Easing</div>
+                            <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Easing</div>
                             <div className="mb-2 grid grid-cols-2 gap-1.5">
                               {EASING_PRESETS.map((preset) => (
                                 <Button
@@ -742,8 +737,8 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                                   className={cn(
                                     "h-7 rounded-md border px-2 text-[10px] font-semibold uppercase tracking-[0.08em]",
                                     easingNormalized === normalizeEasing(preset)
-                                      ? "border-[#236a56] bg-[#dff0e8] text-[#24533f]"
-                                      : "border-[#d3d8cb] bg-[#f8f9f5] text-[#4d564c]",
+                                      ? "border-primary bg-accent text-accent-foreground"
+                                      : "border-border bg-background text-muted-foreground",
                                   )}
                                 >
                                   {preset}
@@ -754,7 +749,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                               value={item.easing.startsWith("cubic-bezier") ? item.easing : ""}
                               onChange={(event) => canEditTokens && updateToken(item.id, { isSpring: false, easing: event.target.value })}
                               placeholder="cubic-bezier(0.42, 0, 0.58, 1)"
-                              className="h-8 border-[#d3d8cb] bg-[#f8f9f5] px-2 font-mono text-[10px]"
+                              className="h-8 border-border bg-background px-2 font-mono text-[10px]"
                             />
                           </div>
                         )}

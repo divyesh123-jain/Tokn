@@ -171,18 +171,18 @@ export function TokenListPanel({
   }
 
   return (
-    <aside className="flex w-62 shrink-0 flex-col border-r border-[#dddcd7] bg-[#efefed]">
-      <div className="border-b border-[#dddcd7] px-4 pb-4 pt-5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8b8a83]">Workspace</p>
+    <aside className="flex w-62 shrink-0 flex-col border-r border-border bg-muted/30">
+      <div className="border-b border-border px-4 pb-4 pt-5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspace</p>
         <div className="mt-2 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#4c3dc9] text-sm font-bold text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
             M
           </div>
           <div>
-            <p className="text-[13px] font-semibold leading-tight text-[#161616]">
+            <p className="text-[13px] font-semibold leading-tight text-foreground">
               {workspaceName?.trim() || "Workspace"}
             </p>
-            <p className="text-[10px] uppercase tracking-[0.12em] text-[#84837c]">v1.0.0-beta</p>
+            <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">v1.0.0-beta</p>
           </div>
         </div>
 
@@ -198,8 +198,8 @@ export function TokenListPanel({
                 className={cn(
                   "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-widest",
                   active
-                    ? "bg-[#d9d7f3] text-[#2d247c]"
-                    : "text-[#4d4b44] hover:bg-[#e6e5df]",
+                    ? "bg-accent text-accent-foreground"
+                    : "text-foreground hover:bg-muted",
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -213,12 +213,12 @@ export function TokenListPanel({
       <nav className="min-h-0 flex-1 overflow-auto px-3 py-4 transition-all duration-300">
         {activeSection === "library" ? (
           <div>
-            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8b8a83]">Categories</p>
+            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Categories</p>
             <div className="space-y-1">
               {categoryStats.map(({ category, count }) => (
                 <div
                   key={category}
-                  className="flex items-center justify-between rounded-md px-2 py-1.5 text-[11px] text-[#3f3d35]"
+                  className="flex items-center justify-between rounded-md px-2 py-1.5 text-[11px] text-foreground"
                 >
                   <div className="flex items-center gap-2">
                     <div
@@ -227,7 +227,7 @@ export function TokenListPanel({
                     />
                     <span>{category}</span>
                   </div>
-                  <span className="text-[10px] text-[#7f7d74]">{count}</span>
+                  <span className="text-[10px] text-muted-foreground">{count}</span>
                 </div>
               ))}
             </div>
@@ -235,18 +235,18 @@ export function TokenListPanel({
         ) : (
           <>
             <div className="relative mb-3">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8f8d84]" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={searchQuery}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search token"
-                className="h-8 rounded-md border-[#d6d4cd] bg-[#f7f7f5] py-1 pl-8 pr-2 text-xs shadow-none"
+                className="h-8 rounded-md border-border bg-muted/30 py-1 pl-8 pr-2 text-xs shadow-none"
               />
             </div>
             <div className="space-y-3">
               {grouped.map((group) => (
                 <div key={group.category}>
-                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-[#8c8a81]">
+                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     {group.category}
                   </p>
                   {group.items.map((token) => {
@@ -268,7 +268,7 @@ export function TokenListPanel({
                         <div
                           className={cn(
                             "flex items-center gap-1 rounded-md px-2 py-1.5",
-                            selected ? "bg-[#dbdaf5]" : "hover:bg-[#e7e6e1]",
+                            selected ? "bg-accent" : "hover:bg-muted",
                           )}
                         >
                           <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -293,7 +293,7 @@ export function TokenListPanel({
                                     cancelRename();
                                   }
                                 }}
-                                className="h-6 flex-1 rounded border border-[#d2d0c8] bg-white px-1.5 py-1 font-mono text-xs"
+                                className="h-6 flex-1 rounded border border-border bg-background px-1.5 py-1 font-mono text-xs"
                               />
                             ) : (
                               <button
@@ -304,7 +304,7 @@ export function TokenListPanel({
                                 <span
                                   className={cn(
                                     "truncate text-[12px] font-medium",
-                                    selected ? "text-[#2f257f]" : "text-[#27261f]",
+                                    selected ? "text-primary" : "text-foreground",
                                   )}
                                 >
                                   {token.name || "untitled"}
@@ -315,7 +315,7 @@ export function TokenListPanel({
                                   return rel ? (
                                     <Badge
                                       variant="secondary"
-                                      className="h-4 border-0 bg-[#ecebfa] px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-[#3d318f]"
+                                      className="h-4 border-0 bg-accent px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-accent-foreground"
                                       title={token.updatedAt ? new Date(token.updatedAt).toLocaleString() : undefined}
                                     >
                                       {rel}
@@ -336,7 +336,7 @@ export function TokenListPanel({
                                     size="icon"
                                     onClick={(event) => event.stopPropagation()}
                                     className={cn(
-                                      "h-6 w-6 rounded-md text-[#888780] hover:bg-[#dedcd5]",
+                                      "h-6 w-6 rounded-md text-muted-foreground hover:bg-muted",
                                       showMenu ? "opacity-100" : "opacity-0",
                                     )}
                                   >
@@ -367,8 +367,8 @@ export function TokenListPanel({
                         </div>
 
                         {showDeleteConfirm ? (
-                          <div className="mt-1 rounded-md border border-[#d6d4cd] bg-[#f9f8f4] p-2 text-xs shadow-sm">
-                            <p className="text-[#1f1e1a]">Delete {token.name || "untitled"}? This cannot be undone.</p>
+                          <div className="mt-1 rounded-md border border-border bg-card p-2 text-xs shadow-sm">
+                            <p className="text-foreground">Delete {token.name || "untitled"}? This cannot be undone.</p>
                             <div className="mt-2 flex justify-end gap-1.5">
                               <Button
                                 type="button"
@@ -399,7 +399,7 @@ export function TokenListPanel({
         )}
       </nav>
 
-      <div className="space-y-2 border-t border-[#dddcd7] p-3">
+      <div className="space-y-2 border-t border-border p-3">
         {canEditTokens ? (
           <Button
             type="button"
@@ -421,16 +421,16 @@ export function TokenListPanel({
               void createTokenAction();
             }}
             disabled={tokenLimitReached}
-            className="h-8 w-full justify-center rounded-md border border-dashed border-[#cbc9c1] bg-transparent text-xs font-medium text-[#4d4b44] hover:bg-[#e8e7e2]"
+            className="h-8 w-full justify-center rounded-md border border-dashed border-border bg-transparent text-xs font-medium text-foreground hover:bg-muted"
           >
             New Token
           </Button>
         ) : null}
-        <div className="px-1 text-[10px] text-[#7f7d74]">
+        <div className="px-1 text-[10px] text-muted-foreground">
           {activeTokenCount} active tokens
           {unsyncedCount > 0 ? ` • ${unsyncedCount} pending sync` : " • live sync"}
         </div>
-        <div className="mt-3 border-t border-[#dddcd7] pt-3 text-[10px] uppercase tracking-widest text-[#86847b]">
+        <div className="mt-3 border-t border-border pt-3 text-[10px] uppercase tracking-widest text-muted-foreground">
           <div className="flex items-center gap-1.5 px-1 py-1">
             <LifeBuoy className="h-3 w-3" />
             Support
