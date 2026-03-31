@@ -314,7 +314,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
         </div>
       </header>
       <div className="min-h-0 flex-1">
-        <MotionStudio embedded />
+        <MotionStudio embedded workspaceName={workspace.name} />
       </div>
 
       <Dialog open={publishOpen && canPublish} onOpenChange={setPublishOpen}>
