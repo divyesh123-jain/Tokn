@@ -8,7 +8,7 @@ import { AccentThemeProvider } from "@/components/theme/accent-theme-provider";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <AccentThemeProvider>{children}</AccentThemeProvider>
       <Toaster richColors position="bottom-right" />
     </ThemeProvider>
