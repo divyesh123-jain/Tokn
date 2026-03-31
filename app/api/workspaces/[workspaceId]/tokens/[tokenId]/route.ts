@@ -165,7 +165,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   context: { params: Promise<{ workspaceId: string; tokenId: string }> },
 ) {
   const user = await getSessionUser();
@@ -202,14 +202,21 @@ export async function DELETE(
   }
 
   const now = new Date();
+  const body = (await req.json().catch(() => null)) as { soft?: boolean } | null;
+  const shouldSoftDelete = Boolean(body?.soft) || Boolean(existingRows[0].publishedAt);
 
-  if (existingRows[0].publishedAt) {
-    await db
+  if (shouldSoftDelete) {
+    const updatedRows = await db
       .update(motionTokens)
       .set({ deprecated: true, updatedAt: now })
-      .where(and(eq(motionTokens.id, tokenId), eq(motionTokens.workspaceId, workspaceId)));
+      .where(and(eq(motionTokens.id, tokenId), eq(motionTokens.workspaceId, workspaceId)))
+      .returning();
 
-    return NextResponse.json({ deleted: false, deprecated: true });
+    const updatedItem = motionTokenDbRowToItem(
+      updatedRows[0] as unknown as { workspaceId: string; id: string } & typeof updatedRows[0],
+    );
+
+    return NextResponse.json({ deleted: false, deprecated: true, token: updatedItem });
   }
 
   await db

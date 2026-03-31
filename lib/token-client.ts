@@ -71,17 +71,25 @@ export async function deleteTokenRemote(
   workspaceId: string,
   tokenId: string,
   soft: boolean,
-): Promise<MotionTokenItem> {
+): Promise<MotionTokenItem | null> {
   const res = await fetch(`/api/workspaces/${workspaceId}/tokens/${tokenId}`, {
     ...workspaceApiFetchInit,
     method: "DELETE",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ soft }),
   });
-  const json = (await res.json().catch(() => null)) as { token?: MotionTokenItem; error?: string } | null;
-  if (!res.ok || !json?.token) {
+  const json = (await res.json().catch(() => null)) as
+    | { token?: MotionTokenItem; deleted?: boolean; error?: string }
+    | null;
+  if (!res.ok) {
     toast.error(json?.error ?? "Could not delete token");
     throw new Error(json?.error ?? "delete failed");
   }
-  return { ...json.token, pendingSync: false };
+  if (json?.token) {
+    return { ...json.token, pendingSync: false };
+  }
+  if (json?.deleted) {
+    return null;
+  }
+  return null;
 }

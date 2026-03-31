@@ -134,7 +134,8 @@ export async function duplicateTokenAction(id: string): Promise<string | null> {
 
   const ws = store.workspaceId;
   const nextId = crypto.randomUUID();
-  const { id: _sid, ...rest } = source;
+  const rest: Omit<MotionTokenItem, "id"> = { ...source };
+  delete (rest as { id?: string }).id;
   const duplicateName = createAutoTokenName(source.category, `copy-${Date.now().toString(36).slice(-4)}`);
 
   if (!ws) {
@@ -221,6 +222,16 @@ export async function softDeleteTokenAction(id: string) {
 
   try {
     const updated = await deleteTokenRemote(ws, id, true);
+    if (!updated) {
+      useTokenStore.setState((s) => ({
+        tokens: s.tokens.map((t) =>
+          t.id === id ? { ...t, deprecated: true, updatedAt: new Date().toISOString() } : t,
+        ),
+        replayKey: s.replayKey + 1,
+      }));
+      return;
+    }
+
     useTokenStore.setState((s) => ({
       tokens: s.tokens.map((t) => (t.id === id ? { ...updated, pendingSync: false } : t)),
       replayKey: s.replayKey + 1,

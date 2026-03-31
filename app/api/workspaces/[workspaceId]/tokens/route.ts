@@ -4,6 +4,11 @@ import { z } from "zod";
 
 import { getDb } from "@/db";
 import { motionTokens, workspaces } from "@/db/schema";
+
+function isMissingSlugColumnError(error: unknown) {
+  const e = error as { code?: string; cause?: { code?: string } };
+  return e?.code === "42703" || e?.cause?.code === "42703";
+}
 import {
   getSessionUser,
   requireWorkspaceRole,
@@ -185,7 +190,28 @@ export async function POST(
     throw error;
   }
 
-  const workspaceRows = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId));
+  let workspaceRows: Array<{
+    id: string;
+    name: string;
+    kind: string;
+    createdAt: Date;
+  }> = [];
+
+  try {
+    workspaceRows = await db.select().from(workspaces).where(eq(workspaces.id, workspaceId));
+  } catch (error) {
+    if (!isMissingSlugColumnError(error)) throw error;
+    workspaceRows = await db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        kind: workspaces.kind,
+        createdAt: workspaces.createdAt,
+      })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId));
+  }
+
   if (workspaceRows.length === 0) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
