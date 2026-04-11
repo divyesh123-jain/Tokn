@@ -23,7 +23,7 @@ import {
   leaveWorkspaceSession,
   useTokenStore,
 } from "@/lib/token-store";
-import type { MotionTokenItem } from "@/lib/motif";
+import type { MotionTokenItem } from "@/lib/tokn-constants";
 import { scheduleRouterAction } from "@/lib/safe-router";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import { buildWorkspacePreviewSlug } from "@/lib/workspace-slug";

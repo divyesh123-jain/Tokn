@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ReactNode } from "react";
 
-import { appNav } from "@/lib/motif";
+import { appNav } from "@/lib/tokn-constants";
 
 type AppShellProps = {
   title: string;

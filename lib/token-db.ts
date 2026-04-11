@@ -1,4 +1,4 @@
-import type { MotionTokenItem } from "./motif";
+import type { MotionTokenItem } from "./tokn-constants";
 
 const SCALE_START_FACTOR = 1000;
 const OPACITY_START_FACTOR = 1000;

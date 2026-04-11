@@ -23,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { categoryConfig } from "@/lib/motif";
+import { categoryConfig } from "@/lib/tokn-constants";
 import { useTokenStore } from "@/lib/token-store";
 import {
   createTokenAction,

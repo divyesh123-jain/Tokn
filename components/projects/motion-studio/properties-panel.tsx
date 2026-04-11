@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { MotionTokenItem } from "@/lib/motif";
+import type { MotionTokenItem } from "@/lib/tokn-constants";
 import { getTokenNameValidationError } from "@/lib/token-name";
 import { useSelectedToken, useTokenStore } from "@/lib/token-store";
 import {

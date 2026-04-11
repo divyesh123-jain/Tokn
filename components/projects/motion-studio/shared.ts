@@ -1,4 +1,4 @@
-import type { MotionTokenCategory, MotionTokenItem } from "@/lib/motif";
+import type { MotionTokenCategory, MotionTokenItem } from "@/lib/tokn-constants";
 
 export type StudioSection = "library" | "physics-lab" | "inspector" | "manifest";
 

@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { TOKEN_DEFAULTS, type MotionTokenItem } from "@/lib/motif";
+import { TOKEN_DEFAULTS, type MotionTokenItem } from "@/lib/tokn-constants";
 import {
   buildCreateTokenBody,
   createTokenRemote as createTokenRemoteImpl,

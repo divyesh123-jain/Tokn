@@ -1,8 +1,8 @@
 import { toast } from "sonner";
 
-import type { MotionTokenItem } from "@/lib/motif";
+import type { MotionTokenItem } from "@/lib/tokn-constants";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
-import { TOKEN_DEFAULTS } from "@/lib/motif";
+import { TOKEN_DEFAULTS } from "@/lib/tokn-constants";
 import { createAutoTokenName } from "@/lib/token-name";
 
 function tokenToApiBody(t: MotionTokenItem) {

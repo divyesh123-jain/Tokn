@@ -1,4 +1,4 @@
-import type { MotionTokenItem } from "./motif";
+import type { MotionTokenItem } from "./tokn-constants";
 
 export function transformToken(token: MotionTokenItem) {
   return {

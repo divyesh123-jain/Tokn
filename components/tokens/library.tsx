@@ -23,7 +23,7 @@ import {
   motionCategories,
   type MotionTokenCategory,
   type MotionTokenItem,
-} from "@/lib/motif";
+} from "@/lib/tokn-constants";
 import { getTokenNameValidationError } from "@/lib/token-name";
 import { useSelectedToken, useTokenStore } from "@/lib/token-store";
 import { deleteTokenAction, saveTokenNameAction } from "@/lib/token-actions";

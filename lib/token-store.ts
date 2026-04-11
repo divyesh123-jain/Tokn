@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import {
   type MotionTokenItem,
   initialMotionTokens,
-} from "./motif";
+} from "./tokn-constants";
 import type { WorkspaceRole } from "./workspace-types";
 import {
   patchTokenRemote,

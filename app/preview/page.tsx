@@ -5,7 +5,7 @@ import { Play } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { useSelectedToken, useTokenStore, type PreviewComponent } from "@/lib/token-store";
-import type { MotionTokenItem } from "@/lib/motif";
+import type { MotionTokenItem } from "@/lib/tokn-constants";
 
 const previewTargets: {
   component: PreviewComponent;

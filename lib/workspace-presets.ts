@@ -1,4 +1,4 @@
-import { initialMotionTokens, type MotionTokenItem } from "@/lib/motif";
+import { initialMotionTokens, type MotionTokenItem } from "@/lib/tokn-constants";
 
 export const MOTION_PRESETS = ["apple-smooth", "linear-snappy", "minimal"] as const;
 

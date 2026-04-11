@@ -9,7 +9,7 @@ import {
   categoryOrder,
   type MotionTokenCategory,
   type MotionTokenItem,
-} from "@/lib/motif";
+} from "@/lib/tokn-constants";
 
 const EASING_MAP: Record<string, [number, number, number, number]> = {
   "ease-out": [0, 0, 0.58, 1],

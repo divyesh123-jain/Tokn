@@ -14,7 +14,7 @@ import {
   requireWorkspaceRole,
   WorkspaceRoleError,
 } from "@/lib/auth-helpers";
-import { SPRING_DEFAULTS } from "@/lib/motif";
+import { SPRING_DEFAULTS } from "@/lib/tokn-constants";
 import { getTokenNameValidationError } from "@/lib/token-name";
 import { motionTokenItemToDbFields, motionTokenDbRowToItem } from "@/lib/token-db";
 

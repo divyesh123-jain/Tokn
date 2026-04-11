@@ -1,4 +1,4 @@
-import type { MotionTokenItem } from "@/lib/motif";
+import type { MotionTokenItem } from "@/lib/tokn-constants";
 import { patchTokenRemote } from "@/lib/token-client";
 
 const DEBOUNCE_MS = 480;

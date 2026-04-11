@@ -2,7 +2,7 @@ import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { motionTokens, workspaces } from "@/db/schema";
-import type { MotionTokenItem } from "@/lib/motif";
+import type { MotionTokenItem } from "@/lib/tokn-constants";
 import { motionTokenDbRowToItem } from "@/lib/token-db";
 import {
   buildWorkspacePreviewSlug,

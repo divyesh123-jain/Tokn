@@ -9,7 +9,7 @@ import {
   type MotionTokenCategory,
   categoryConfig,
   TOKEN_DEFAULTS,
-} from "@/lib/motif";
+} from "@/lib/tokn-constants";
 
 type DraftToken = Omit<MotionTokenItem, "id">;
 

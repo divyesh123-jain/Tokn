@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { recentUpdateLabel } from "@/lib/token-recent";
 import { getTokenNameValidationError } from "@/lib/token-name";
 import { cn } from "@/lib/utils";
-import { categoryConfig, categoryOrder } from "@/lib/motif";
+import { categoryConfig, categoryOrder } from "@/lib/tokn-constants";
 import { useTokenStore } from "@/lib/token-store";
 import {
   createTokenAction,
