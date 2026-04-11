@@ -153,6 +153,7 @@ export async function PATCH(
     .set({
       ...dbFields,
       updatedAt: now,
+      updatedBy: user.userId,
     })
     .where(and(eq(motionTokens.id, tokenId), eq(motionTokens.workspaceId, workspaceId)))
     .returning();
@@ -208,7 +209,7 @@ export async function DELETE(
   if (shouldSoftDelete) {
     const updatedRows = await db
       .update(motionTokens)
-      .set({ deprecated: true, updatedAt: now })
+      .set({ deprecated: true, updatedAt: now, updatedBy: user.userId })
       .where(and(eq(motionTokens.id, tokenId), eq(motionTokens.workspaceId, workspaceId)))
       .returning();
 

@@ -269,6 +269,7 @@ export async function POST(
       workspaceId,
       createdAt: now,
       updatedAt: now,
+      updatedBy: user.userId,
       ...itemFields,
     })
     .returning();

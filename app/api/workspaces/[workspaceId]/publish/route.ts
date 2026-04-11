@@ -100,6 +100,7 @@ export async function POST(
       publishedAt: now,
       publishedVersion: version,
       updatedAt: now,
+      updatedBy: user.userId,
     })
     .where(and(eq(motionTokens.workspaceId, workspaceId), eq(motionTokens.deprecated, false)))
     .returning({ id: motionTokens.id });

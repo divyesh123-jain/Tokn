@@ -173,6 +173,7 @@ export async function POST(req: Request) {
       workspaceId,
       createdAt: now,
       updatedAt: now,
+      updatedBy: user.userId,
       ...motionTokenItemToDbFields(token),
     };
   });

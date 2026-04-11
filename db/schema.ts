@@ -100,6 +100,7 @@ export const motionTokens = pgTable(
     deprecated: boolean("deprecated").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [
     unique("motion_tokens_workspace_name_unique").on(t.workspaceId, t.name),

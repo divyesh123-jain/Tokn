@@ -21,6 +21,7 @@ export type MotionTokenDbRow = {
   springMass: number;
   publishedAt?: Date | string | null;
   publishedVersion?: string | null;
+  updatedBy?: string | null;
   deprecated: boolean;
 };
 
@@ -51,6 +52,7 @@ export function motionTokenDbRowToItem(
     springMass: row.springMass / SPRING_MASS_FACTOR,
     deprecated: row.deprecated,
     updatedAt: toUpdatedAtIso(row.updatedAt),
+    updatedBy: row.updatedBy ?? null,
     publishedAt: toUpdatedAtIso(row.publishedAt),
     publishedVersion: row.publishedVersion ?? undefined,
   };

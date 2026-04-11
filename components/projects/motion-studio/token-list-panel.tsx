@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { recentUpdateLabel } from "@/lib/token-recent";
+import { getTokenNameValidationError } from "@/lib/token-name";
 import { cn } from "@/lib/utils";
 import { categoryConfig, categoryOrder } from "@/lib/motif";
 import { useTokenStore } from "@/lib/token-store";
@@ -38,7 +39,7 @@ import {
 } from "@/lib/token-actions";
 import { flushWorkspaceTokenPatches } from "@/lib/workspace-token-sync";
 
-import type { StudioSection } from "./shared";
+import { normalizeTokenNameInput, type StudioSection } from "./shared";
 
 const SIDEBAR_ROUTES = [
   { key: "library", label: "Library", icon: Boxes },
@@ -125,17 +126,35 @@ export function TokenListPanel({
     setInlineName(currentName);
   }
 
-  function submitRename() {
+  async function submitRename() {
     if (!canEditTokens) return;
     if (!editingTokenId) return;
-    const next = inlineName.trim() || "untitled";
+    const targetToken = tokens.find((token) => token.id === editingTokenId);
+    if (!targetToken) {
+      cancelRename();
+      return;
+    }
+
+    const next = normalizeTokenNameInput(inlineName, targetToken.category);
+    const validationError = getTokenNameValidationError(next);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     if (tokens.some((t) => t.id !== editingTokenId && t.name === next)) {
       toast.error("That name is already taken");
       return;
     }
-    void saveTokenNameAction(editingTokenId, inlineName);
-    setEditingTokenId(null);
-    setInlineName("");
+
+    setInlineName(next);
+    try {
+      await saveTokenNameAction(editingTokenId, next);
+      setEditingTokenId(null);
+      setInlineName("");
+    } catch {
+      // saveTokenNameAction already surfaces validation/server errors via toast.
+    }
   }
 
   function cancelRename() {
@@ -282,11 +301,13 @@ export function TokenListPanel({
                                 ref={inlineInputRef}
                                 value={inlineName}
                                 onChange={(event) => setInlineName(event.target.value)}
-                                onBlur={submitRename}
+                                onBlur={() => {
+                                  void submitRename();
+                                }}
                                 onKeyDown={(event) => {
                                   if (event.key === "Enter") {
                                     event.preventDefault();
-                                    submitRename();
+                                    void submitRename();
                                   }
                                   if (event.key === "Escape") {
                                     event.preventDefault();

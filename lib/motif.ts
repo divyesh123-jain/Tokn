@@ -37,6 +37,8 @@ export type MotionTokenItem = {
   deprecated: boolean;
   /** ISO 8601 from DB or client when the token last changed */
   updatedAt?: string;
+  /** User id of the last editor in team workspaces */
+  updatedBy?: string | null;
   /** ISO 8601 from DB when token was last published */
   publishedAt?: string;
   /** Published semantic version tag, for example v1.2.0 */

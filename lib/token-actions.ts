@@ -3,16 +3,52 @@ import { toast } from "sonner";
 import { TOKEN_DEFAULTS, type MotionTokenItem } from "@/lib/motif";
 import {
   buildCreateTokenBody,
-  createTokenRemote,
-  deleteTokenRemote,
-  patchTokenRemote,
+  createTokenRemote as createTokenRemoteImpl,
+  deleteTokenRemote as deleteTokenRemoteImpl,
+  patchTokenRemote as patchTokenRemoteImpl,
 } from "@/lib/token-client";
 import { createAutoTokenName, getTokenNameValidationError } from "@/lib/token-name";
 import { useTokenStore } from "@/lib/token-store";
 import {
-  cancelPendingTokenPatch,
-  scheduleWorkspaceTokenPatch,
+  cancelPendingTokenPatch as cancelPendingTokenPatchImpl,
+  scheduleWorkspaceTokenPatch as scheduleWorkspaceTokenPatchImpl,
 } from "@/lib/workspace-token-sync";
+
+type TokenActionDeps = {
+  createTokenRemote: typeof createTokenRemoteImpl;
+  deleteTokenRemote: typeof deleteTokenRemoteImpl;
+  patchTokenRemote: typeof patchTokenRemoteImpl;
+  cancelPendingTokenPatch: typeof cancelPendingTokenPatchImpl;
+  scheduleWorkspaceTokenPatch: typeof scheduleWorkspaceTokenPatchImpl;
+  randomId: () => string;
+  nowIso: () => string;
+  notifyError: (message: string) => void;
+};
+
+const defaultTokenActionDeps: TokenActionDeps = {
+  createTokenRemote: createTokenRemoteImpl,
+  deleteTokenRemote: deleteTokenRemoteImpl,
+  patchTokenRemote: patchTokenRemoteImpl,
+  cancelPendingTokenPatch: cancelPendingTokenPatchImpl,
+  scheduleWorkspaceTokenPatch: scheduleWorkspaceTokenPatchImpl,
+  randomId: () => crypto.randomUUID(),
+  nowIso: () => new Date().toISOString(),
+  notifyError: (message) => toast.error(message),
+};
+
+let tokenActionDeps: TokenActionDeps = defaultTokenActionDeps;
+
+export function setTokenActionDeps(overrides: Partial<TokenActionDeps>) {
+  tokenActionDeps = { ...tokenActionDeps, ...overrides };
+}
+
+export function resetTokenActionDeps() {
+  tokenActionDeps = defaultTokenActionDeps;
+}
+
+function deps(): TokenActionDeps {
+  return tokenActionDeps;
+}
 
 function removeTokenLocal(id: string) {
   useTokenStore.setState((s) => {
@@ -33,27 +69,27 @@ function canEditWorkspaceTokens() {
 
 export async function saveTokenNameAction(id: string, name: string) {
   if (!canEditWorkspaceTokens()) {
-    toast.error("Viewer role is read-only");
+    deps().notifyError("Viewer role is read-only");
     throw new Error("forbidden");
   }
   const store = useTokenStore.getState();
   const trimmed = name.trim();
   const validationError = getTokenNameValidationError(trimmed);
   if (validationError) {
-    toast.error(validationError);
+    deps().notifyError(validationError);
     throw new Error(validationError);
   }
   const conflict = store.tokens.some((t) => t.id !== id && t.name === trimmed);
   if (conflict) {
     const message = "Token name already exists";
-    toast.error(message);
+    deps().notifyError(message);
     throw new Error(message);
   }
 
   const ws = store.workspaceId;
-  if (ws) cancelPendingTokenPatch(ws, id);
+  if (ws) deps().cancelPendingTokenPatch(ws, id);
 
-  const now = new Date().toISOString();
+  const now = deps().nowIso();
   useTokenStore.setState((s) => ({
     tokens: s.tokens.map((t) => (t.id === id ? { ...t, name: trimmed, updatedAt: now } : t)),
   }));
@@ -63,7 +99,7 @@ export async function saveTokenNameAction(id: string, name: string) {
   const token = useTokenStore.getState().tokens.find((t) => t.id === id);
   if (!token || token.pendingSync) return;
 
-  const server = await patchTokenRemote(ws, id, token);
+  const server = await deps().patchTokenRemote(ws, id, token);
   useTokenStore.setState((s) => ({
     tokens: s.tokens.map((t) => (t.id === id ? { ...t, ...server, pendingSync: false } : t)),
   }));
@@ -71,17 +107,17 @@ export async function saveTokenNameAction(id: string, name: string) {
 
 export async function createTokenAction() {
   if (!canEditWorkspaceTokens()) {
-    toast.error("Viewer role is read-only");
+    deps().notifyError("Viewer role is read-only");
     return;
   }
   const store = useTokenStore.getState();
   const ws = store.workspaceId;
-  const tempId = crypto.randomUUID();
+  const tempId = deps().randomId();
   const token: MotionTokenItem = {
     ...TOKEN_DEFAULTS,
     id: tempId,
     name: "",
-    updatedAt: new Date().toISOString(),
+    updatedAt: deps().nowIso(),
     pendingSync: Boolean(ws),
   };
 
@@ -96,7 +132,7 @@ export async function createTokenAction() {
   if (!ws) return;
 
   try {
-    const created = await createTokenRemote(ws, buildCreateTokenBody());
+    const created = await deps().createTokenRemote(ws, buildCreateTokenBody());
     useTokenStore.setState((s) => {
       const draft = s.tokens.find((t) => t.id === tempId);
       if (!draft) return {};
@@ -115,7 +151,7 @@ export async function createTokenAction() {
 
     const synced = useTokenStore.getState().tokens.find((t) => t.id === created.id);
     if (synced?.name?.trim()) {
-      scheduleWorkspaceTokenPatch(ws, created.id, useTokenStore.getState);
+      deps().scheduleWorkspaceTokenPatch(ws, created.id, useTokenStore.getState);
     }
   } catch {
     // Roll back optimistic create on network failure.
@@ -125,7 +161,7 @@ export async function createTokenAction() {
 
 export async function duplicateTokenAction(id: string): Promise<string | null> {
   if (!canEditWorkspaceTokens()) {
-    toast.error("Viewer role is read-only");
+    deps().notifyError("Viewer role is read-only");
     return null;
   }
   const store = useTokenStore.getState();
@@ -133,7 +169,7 @@ export async function duplicateTokenAction(id: string): Promise<string | null> {
   if (!source) return null;
 
   const ws = store.workspaceId;
-  const nextId = crypto.randomUUID();
+  const nextId = deps().randomId();
   const rest: Omit<MotionTokenItem, "id"> = { ...source };
   delete (rest as { id?: string }).id;
   const duplicateName = createAutoTokenName(source.category, `copy-${Date.now().toString(36).slice(-4)}`);
@@ -143,7 +179,7 @@ export async function duplicateTokenAction(id: string): Promise<string | null> {
       ...rest,
       id: nextId,
       name: duplicateName,
-      updatedAt: new Date().toISOString(),
+      updatedAt: deps().nowIso(),
       pendingSync: false,
     };
     useTokenStore.setState((s) => {
@@ -167,7 +203,7 @@ export async function duplicateTokenAction(id: string): Promise<string | null> {
       ...rest,
       name: duplicateName,
     });
-    const created = await createTokenRemote(ws, body);
+    const created = await deps().createTokenRemote(ws, body);
     useTokenStore.setState((s) => {
       const index = s.tokens.findIndex((t) => t.id === id);
       const nextTokens = [...s.tokens];
@@ -189,7 +225,7 @@ export async function duplicateTokenAction(id: string): Promise<string | null> {
 
 export async function deleteTokenAction(id: string) {
   if (!canEditWorkspaceTokens()) {
-    toast.error("Viewer role is read-only");
+    deps().notifyError("Viewer role is read-only");
     return;
   }
   const ws = useTokenStore.getState().workspaceId;
@@ -199,7 +235,7 @@ export async function deleteTokenAction(id: string) {
   }
 
   try {
-    await deleteTokenRemote(ws, id, false);
+    await deps().deleteTokenRemote(ws, id, false);
     removeTokenLocal(id);
   } catch {
     // toast handled in token-client
@@ -208,7 +244,7 @@ export async function deleteTokenAction(id: string) {
 
 export async function softDeleteTokenAction(id: string) {
   if (!canEditWorkspaceTokens()) {
-    toast.error("Viewer role is read-only");
+    deps().notifyError("Viewer role is read-only");
     return;
   }
   const ws = useTokenStore.getState().workspaceId;
@@ -221,11 +257,11 @@ export async function softDeleteTokenAction(id: string) {
   }
 
   try {
-    const updated = await deleteTokenRemote(ws, id, true);
+    const updated = await deps().deleteTokenRemote(ws, id, true);
     if (!updated) {
       useTokenStore.setState((s) => ({
         tokens: s.tokens.map((t) =>
-          t.id === id ? { ...t, deprecated: true, updatedAt: new Date().toISOString() } : t,
+          t.id === id ? { ...t, deprecated: true, updatedAt: deps().nowIso() } : t,
         ),
         replayKey: s.replayKey + 1,
       }));
