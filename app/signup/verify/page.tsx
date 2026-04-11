@@ -4,7 +4,7 @@ import { getSessionUserState } from "@/lib/auth-helpers";
 import { VerifyEmailWatcher } from "@/app/signup/verify/verify-email-watcher";
 
 type VerifyPageProps = {
-  searchParams?: Promise<{ email?: string }>;
+  searchParams?: Promise<{ email?: string; invite?: string }>;
 };
 
 export default async function VerifySignupPage({ searchParams }: VerifyPageProps) {
@@ -15,6 +15,7 @@ export default async function VerifySignupPage({ searchParams }: VerifyPageProps
 
   const resolved = (await searchParams) ?? {};
   const email = typeof resolved.email === "string" ? resolved.email.trim() : "";
+  const inviteToken = typeof resolved.invite === "string" ? resolved.invite.trim() : "";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center px-6 text-center">
@@ -23,7 +24,7 @@ export default async function VerifySignupPage({ searchParams }: VerifyPageProps
         We sent a verification link to {email || "your inbox"}. After you verify, you will be sent to onboarding.
       </p>
 
-      <VerifyEmailWatcher email={email} />
+      <VerifyEmailWatcher email={email} inviteToken={inviteToken} />
     </main>
   );
 }

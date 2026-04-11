@@ -18,3 +18,22 @@ export type WorkspaceMember = {
   role: WorkspaceRole;
   createdAt: string;
 };
+
+export type WorkspaceInviteStatus = "pending" | "expired" | "cancelled" | "declined" | "accepted";
+
+export type WorkspaceInvite = {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: WorkspaceRole;
+  token: string;
+  invitedBy: string;
+  invitedByName: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  declinedAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  status: WorkspaceInviteStatus;
+};

@@ -3,10 +3,12 @@ import { z } from "zod";
 
 import { getSessionUserState, getUserWorkspaces } from "@/lib/auth-helpers";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { acceptWorkspaceInviteByToken } from "@/lib/workspace-invites";
 
 const querySchema = z.object({
   code: z.string().optional(),
   flow: z.string().optional(),
+  invite: z.string().uuid().optional(),
   error: z.string().optional(),
   error_description: z.string().optional(),
 });
@@ -18,6 +20,7 @@ export async function GET(req: Request) {
   const parsed = querySchema.safeParse({
     code: url.searchParams.get("code") ?? undefined,
     flow: url.searchParams.get("flow") ?? undefined,
+    invite: url.searchParams.get("invite") ?? undefined,
     error: url.searchParams.get("error") ?? undefined,
     error_description: url.searchParams.get("error_description") ?? undefined,
   });
@@ -56,7 +59,25 @@ export async function GET(req: Request) {
   }
 
   if (parsed.data.flow === "signup") {
+    if (parsed.data.invite && sessionState.user) {
+      const inviteResult = await acceptWorkspaceInviteByToken({
+        token: parsed.data.invite,
+        userId: sessionState.user.userId,
+        userEmail: sessionState.user.email,
+      });
+
+      if (inviteResult.ok) {
+        return NextResponse.redirect(new URL(`/projects/${inviteResult.workspace.id}`, req.url));
+      }
+
+      return NextResponse.redirect(new URL(`/invite/${parsed.data.invite}`, req.url));
+    }
+
     return NextResponse.redirect(new URL("/onboarding?step=1", req.url));
+  }
+
+  if (parsed.data.invite) {
+    return NextResponse.redirect(new URL(`/invite/${parsed.data.invite}`, req.url));
   }
 
   const workspaces = await getUserWorkspaces(sessionState.user.userId);

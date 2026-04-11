@@ -33,13 +33,34 @@ export class WorkspaceRoleError extends Error {
   }
 }
 
+function isSupabaseAuthSessionError(error: unknown): boolean {
+  const e = error as { code?: string; message?: string };
+  if (e?.code === "refresh_token_not_found") return true;
+  const msg = e?.message?.toLowerCase() ?? "";
+  return msg.includes("refresh token") || msg.includes("invalid refresh token");
+}
+
 export async function getSessionUserState(): Promise<SessionUserState> {
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user?.email) {
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] | null = null;
+
+  try {
+    const {
+      data: { user: authUser },
+      error,
+    } = await supabase.auth.getUser();
+    if (error || !authUser?.email) {
+      return { user: null, email: null, emailVerified: false };
+    }
+    user = authUser;
+  } catch (error) {
+    if (isSupabaseAuthSessionError(error)) {
+      return { user: null, email: null, emailVerified: false };
+    }
+    throw error;
+  }
+
+  if (!user?.email) {
     return { user: null, email: null, emailVerified: false };
   }
 

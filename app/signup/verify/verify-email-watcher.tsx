@@ -6,9 +6,10 @@ import { toast } from "sonner";
 
 type VerifyEmailWatcherProps = {
   email: string;
+  inviteToken?: string;
 };
 
-export function VerifyEmailWatcher({ email }: VerifyEmailWatcherProps) {
+export function VerifyEmailWatcher({ email, inviteToken }: VerifyEmailWatcherProps) {
   const router = useRouter();
   const [hasSession, setHasSession] = React.useState<boolean | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = React.useState(60);
@@ -81,7 +82,7 @@ export function VerifyEmailWatcher({ email }: VerifyEmailWatcherProps) {
       const res = await fetch("/api/auth/signup/resend", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, inviteToken }),
       });
 
       const json = (await res.json().catch(() => null)) as { error?: string } | null;

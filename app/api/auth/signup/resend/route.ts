@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 const resendSchema = z.object({
   email: z.string().email(),
+  inviteToken: z.string().uuid().optional(),
 });
 
 function getAppOrigin(req: Request): string {
@@ -32,12 +33,17 @@ export async function POST(req: Request) {
   }
 
   const origin = getAppOrigin(req);
+  const redirectUrl = new URL("/api/auth/callback", origin);
+  redirectUrl.searchParams.set("flow", "signup");
+  if (parsed.data.inviteToken) {
+    redirectUrl.searchParams.set("invite", parsed.data.inviteToken);
+  }
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: parsed.data.email,
     options: {
-      emailRedirectTo: `${origin}/api/auth/callback?flow=signup`,
+      emailRedirectTo: redirectUrl.toString(),
     },
   });
 

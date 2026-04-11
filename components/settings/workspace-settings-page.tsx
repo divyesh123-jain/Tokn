@@ -5,7 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,9 +25,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { scheduleRouterAction } from "@/lib/safe-router";
+import { formatInviteCountdown } from "@/lib/invite-display";
 import { sanitizeWorkspaceSlug } from "@/lib/workspace-slug";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import type {
+  WorkspaceInvite,
   WorkspaceMember,
   WorkspaceRole,
   WorkspaceSummary,
@@ -28,6 +39,8 @@ type WorkspaceDetail = WorkspaceSummary;
 
 type AuthUser = {
   id: string;
+  email: string;
+  fullName: string | null;
 };
 
 const roleLabel: Record<WorkspaceRole, string> = {
@@ -43,6 +56,7 @@ export function WorkspaceSettingsPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [workspace, setWorkspace] = useState<WorkspaceDetail | null>(null);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<WorkspaceInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
 
@@ -59,6 +73,9 @@ export function WorkspaceSettingsPage() {
   const [inviting, setInviting] = useState(false);
   const [memberUpdatingId, setMemberUpdatingId] = useState<string | null>(null);
   const [memberRemovingId, setMemberRemovingId] = useState<string | null>(null);
+  const [inviteActionId, setInviteActionId] = useState<string | null>(null);
+  const [cancelInviteTarget, setCancelInviteTarget] = useState<WorkspaceInvite | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const targetWorkspaceId = searchParams.get("workspaceId");
 
@@ -69,6 +86,7 @@ export function WorkspaceSettingsPage() {
 
     async function load() {
       setLoading(true);
+      setPendingInvites([]);
 
       const [authRes, listRes] = await Promise.all([
         fetch("/api/auth/me", workspaceApiFetchInit),
@@ -143,8 +161,25 @@ export function WorkspaceSettingsPage() {
         } else {
           setMembers(membersJson?.members ?? []);
         }
+
+        if (loadedWorkspace.role === "owner") {
+          const invitesRes = await fetch(
+            `/api/workspaces/${loadedWorkspace.id}/invites`,
+            workspaceApiFetchInit,
+          );
+          const invitesJson = (await invitesRes.json().catch(() => null)) as
+            | { invites?: WorkspaceInvite[]; error?: string }
+            | null;
+          if (!invitesRes.ok) {
+            toast.error(invitesJson?.error ?? "Could not load pending invites");
+            setPendingInvites([]);
+          } else {
+            setPendingInvites(invitesJson?.invites ?? []);
+          }
+        }
       } else {
         setMembers([]);
+        setPendingInvites([]);
       }
 
       setLoading(false);
@@ -156,6 +191,11 @@ export function WorkspaceSettingsPage() {
     };
   }, [router, targetWorkspaceId]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const slugPreview = useMemo(
     () => `${typeof window !== "undefined" ? window.location.origin : "https://tokn.so"}/preview/${sanitizeWorkspaceSlug(slugDraft)}`,
     [slugDraft],
@@ -165,6 +205,40 @@ export function WorkspaceSettingsPage() {
     Boolean(workspace) &&
     canManageWorkspace &&
     confirmName.trim() === (workspace?.name ?? "");
+
+  const normalizedInviteEmail = inviteEmail.trim().toLowerCase();
+  const inviteEmailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedInviteEmail);
+  const currentMember = members.find((member) => member.email.toLowerCase() === normalizedInviteEmail);
+  const pendingInvite = pendingInvites.find(
+    (invite) => invite.email.toLowerCase() === normalizedInviteEmail && invite.status === "pending",
+  );
+  const expiredInvite = pendingInvites.find(
+    (invite) => invite.email.toLowerCase() === normalizedInviteEmail && invite.status === "expired",
+  );
+
+  const inviteFieldState = useMemo(() => {
+    if (!normalizedInviteEmail || !inviteEmailLooksValid) {
+      return { tone: "none" as const, message: "" };
+    }
+    if (authUser?.email?.toLowerCase() === normalizedInviteEmail) {
+      return { tone: "error" as const, message: "You cannot invite yourself" };
+    }
+    if (currentMember) {
+      return { tone: "error" as const, message: "This person is already a member" };
+    }
+    if (pendingInvite) {
+      return { tone: "warning" as const, message: "A pending invite exists for this email. Resend?" };
+    }
+    if (expiredInvite) {
+      return { tone: "neutral" as const, message: "This email had an expired invite. Send a new one." };
+    }
+    return { tone: "success" as const, message: "Email looks good" };
+  }, [authUser?.email, currentMember, expiredInvite, inviteEmailLooksValid, normalizedInviteEmail, pendingInvite]);
+
+  const visibleInvites = useMemo(
+    () => pendingInvites.filter((invite) => invite.status === "pending" || invite.status === "expired"),
+    [pendingInvites],
+  );
 
   function switchWorkspace(nextWorkspaceId: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -247,44 +321,115 @@ export function WorkspaceSettingsPage() {
     }
   }
 
-  async function inviteMember() {
+  async function saveInvite(emailOverride?: string, roleOverride?: WorkspaceRole) {
     if (!workspace || workspace.kind !== "team" || !canManageWorkspace || inviting) return;
-    if (!inviteEmail.trim()) {
+    const nextEmail = (emailOverride ?? inviteEmail).trim();
+    const nextRole = roleOverride ?? inviteRole;
+
+    if (!nextEmail) {
       toast.error("Enter an email");
+      return;
+    }
+    if (!inviteEmailLooksValid) {
+      toast.error("Enter a valid email");
+      return;
+    }
+    if (authUser?.email?.toLowerCase() === nextEmail.toLowerCase()) {
+      toast.error("You cannot invite yourself");
+      return;
+    }
+    if (currentMember) {
+      toast.error("This person is already a member");
       return;
     }
 
     setInviting(true);
     try {
-      const res = await fetch(`/api/workspaces/${workspace.id}/members`, {
+      const res = await fetch(`/api/workspaces/${workspace.id}/invites`, {
         ...workspaceApiFetchInit,
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          email: inviteEmail.trim(),
-          role: inviteRole,
+          email: nextEmail,
+          role: nextRole,
         }),
       });
       const json = (await res.json().catch(() => null)) as
-        | { member?: WorkspaceMember; error?: string }
+        | {
+            invite?: WorkspaceInvite;
+            invites?: WorkspaceInvite[];
+            error?: string;
+            resent?: boolean;
+            emailSent?: boolean;
+            emailNotice?: string;
+          }
         | null;
-      if (!res.ok || !json?.member) {
-        toast.error(json?.error ?? "Could not invite member");
+      if (!res.ok || !json?.invite) {
+        toast.error(json?.error ?? "Could not send invite");
         return;
       }
 
-      setMembers((current) => {
-        const idx = current.findIndex((m) => m.id === json.member?.id);
-        if (idx === -1) return [...current, json.member as WorkspaceMember];
-        const next = [...current];
-        next[idx] = json.member as WorkspaceMember;
-        return next;
-      });
+      setPendingInvites(json.invites ?? []);
       setInviteEmail("");
       setInviteRole("editor");
-      toast.success("Member added");
+      if (json.emailSent === false) {
+        toast.message(json.emailNotice ?? "Invite created. Email delivery is currently disabled.");
+      } else {
+        toast.success(json.resent ? "Invite resent ✓" : "Invite sent ✓");
+      }
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function resendInvite(invite: WorkspaceInvite) {
+    if (!workspace || inviting) return;
+    setInviteActionId(invite.id);
+    try {
+      const res = await fetch(`/api/workspaces/${workspace.id}/invites/${invite.id}`, {
+        ...workspaceApiFetchInit,
+        method: "PATCH",
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { invite?: WorkspaceInvite; error?: string; emailSent?: boolean; emailNotice?: string }
+        | null;
+      if (!res.ok || !json?.invite) {
+        toast.error(json?.error ?? "Could not resend invite");
+        return;
+      }
+
+      setPendingInvites((current) => current.map((item) => (item.id === json.invite?.id ? json.invite as WorkspaceInvite : item)));
+      if (json.emailSent === false) {
+        toast.message(json.emailNotice ?? "Invite was refreshed. Email delivery is currently disabled.");
+      } else {
+        toast.success("Resent ✓");
+      }
+    } finally {
+      setInviteActionId(null);
+    }
+  }
+
+  async function cancelInvite(invite: WorkspaceInvite) {
+    if (!workspace) return;
+    setInviteActionId(invite.id);
+    try {
+      const res = await fetch(`/api/workspaces/${workspace.id}/invites/${invite.id}`, {
+        ...workspaceApiFetchInit,
+        method: "DELETE",
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { invite?: WorkspaceInvite; error?: string }
+        | null;
+      if (!res.ok || !json?.invite) {
+        toast.error(json?.error ?? "Could not cancel invite");
+        return;
+      }
+
+      setPendingInvites((current) => current.map((item) => (item.id === json.invite?.id ? json.invite as WorkspaceInvite : item)));
+      setCancelInviteTarget(null);
+      toast.success("Invite cancelled");
+    } finally {
+      setInviteActionId(null);
     }
   }
 
@@ -404,7 +549,7 @@ export function WorkspaceSettingsPage() {
             Rename your workspace. Only owners can save changes.
           </p>
           <div className="mt-4 flex flex-wrap items-end gap-3">
-            <div className="min-w-[260px] flex-1 space-y-1.5">
+            <div className="min-w-65 flex-1 space-y-1.5">
               <Label htmlFor="workspace-name">Workspace name</Label>
               <Input
                 id="workspace-name"
@@ -426,7 +571,7 @@ export function WorkspaceSettingsPage() {
             Change the URL identifier used for public preview links.
           </p>
           <div className="mt-4 flex flex-wrap items-end gap-3">
-            <div className="min-w-[260px] flex-1 space-y-1.5">
+            <div className="min-w-65 flex-1 space-y-1.5">
               <Label htmlFor="workspace-slug">Slug</Label>
               <Input
                 id="workspace-slug"
@@ -445,44 +590,13 @@ export function WorkspaceSettingsPage() {
 
         {workspace.kind === "team" ? (
           <section className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-lg font-semibold text-foreground">Team members</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-foreground">Team members</h3>
+              <Badge variant="outline">{members.length} members</Badge>
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">
               Owners can invite members, remove members, and change roles.
             </p>
-
-            {canManageWorkspace ? (
-              <div className="mt-4 grid gap-3 rounded-lg border border-border p-3 md:grid-cols-[1fr_170px_auto]">
-                <div className="space-y-1.5">
-                  <Label htmlFor="invite-email">Invite by email</Label>
-                  <Input
-                    id="invite-email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="teammate@company.com"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Role</Label>
-                  <Select
-                    value={inviteRole}
-                    onValueChange={(value) => setInviteRole(value as WorkspaceRole)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="editor">Editor</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={() => void inviteMember()} disabled={inviting}>
-                    {inviting ? "Inviting..." : "Invite"}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
 
             <div className="mt-4 space-y-2">
               {members.length === 0 ? (
@@ -518,7 +632,7 @@ export function WorkspaceSettingsPage() {
                             void updateMemberRole(member.id, value as WorkspaceRole)
                           }
                         >
-                          <SelectTrigger className="w-[130px]">
+                          <SelectTrigger className="w-32.5">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -541,8 +655,155 @@ export function WorkspaceSettingsPage() {
                 })
               )}
             </div>
+
+            {canManageWorkspace ? (
+              <>
+                <div className="mt-6 rounded-xl border border-border bg-background p-4">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-base font-semibold text-foreground">Pending invites</h4>
+                    <Badge variant="outline">{visibleInvites.length}</Badge>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {visibleInvites.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No pending invites</p>
+                    ) : (
+                      visibleInvites.map((invite) => {
+                        const countdown = formatInviteCountdown(invite.expiresAt, now);
+                        const isActioning = inviteActionId === invite.id;
+                        return (
+                          <div
+                            key={invite.id}
+                            className="grid gap-3 rounded-lg border border-border px-3 py-3 md:grid-cols-[1.2fr_120px_120px_auto] md:items-center"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{invite.email}</p>
+                              <p className="text-xs text-muted-foreground">Invited by {invite.invitedByName}</p>
+                            </div>
+                            <Badge variant={invite.role === "editor" ? "default" : "outline"} className="justify-self-start">
+                              {roleLabel[invite.role]}
+                            </Badge>
+                            <div>
+                              <p className={invite.status === "expired" || countdown.tone === "danger" ? "text-sm font-medium text-red-600" : countdown.tone === "warning" ? "text-sm font-medium text-amber-600" : "text-sm font-medium text-foreground"}>
+                                {countdown.label}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {invite.status === "expired" ? "Expired" : "Expires"} {new Date(invite.expiresAt).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2 justify-self-start md:justify-self-end">
+                              {(invite.status === "pending" || invite.status === "expired") ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void resendInvite(invite)}
+                                  disabled={isActioning}
+                                >
+                                  {isActioning ? "Working..." : "Resend"}
+                                </Button>
+                              ) : null}
+                              {invite.status === "pending" ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setCancelInviteTarget(invite)}
+                                  disabled={isActioning}
+                                >
+                                  ×
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-xl border border-border bg-background p-4">
+                  <h4 className="text-base font-semibold text-foreground">Invite a new member</h4>
+                  <div className="mt-4 grid gap-3 md:grid-cols-[1fr_170px_auto] md:items-end">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="invite-email">Email address</Label>
+                      <Input
+                        id="invite-email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="teammate@company.com"
+                        aria-invalid={inviteFieldState.tone === "error"}
+                      />
+                      {inviteFieldState.message ? (
+                        <p
+                          className={
+                            inviteFieldState.tone === "error"
+                              ? "text-xs text-red-600"
+                              : inviteFieldState.tone === "warning"
+                                ? "text-xs text-amber-600"
+                                : inviteFieldState.tone === "success"
+                                  ? "text-xs text-emerald-600"
+                                  : "text-xs text-muted-foreground"
+                          }
+                        >
+                          {inviteFieldState.message}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Role</Label>
+                      <Select
+                        value={inviteRole}
+                        onValueChange={(value) => setInviteRole(value as WorkspaceRole)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="editor">Editor</SelectItem>
+                          <SelectItem value="viewer">Viewer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        onClick={() => void saveInvite()}
+                        disabled={
+                          inviting ||
+                          !inviteEmailLooksValid ||
+                          Boolean(currentMember) ||
+                          authUser?.email?.toLowerCase() === normalizedInviteEmail
+                        }
+                      >
+                        {inviting ? "Sending..." : pendingInvite ? "Resend invite" : "Send invite"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </section>
         ) : null}
+
+        <Dialog open={Boolean(cancelInviteTarget)} onOpenChange={(open) => !open && setCancelInviteTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel invite to {cancelInviteTarget?.email}?</DialogTitle>
+              <DialogDescription>
+                They will not be able to use the invite link.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCancelInviteTarget(null)}>
+                Keep invite
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => cancelInviteTarget && void cancelInvite(cancelInviteTarget)}
+                disabled={!cancelInviteTarget || inviteActionId === cancelInviteTarget.id}
+              >
+                {inviteActionId === cancelInviteTarget?.id ? "Cancelling..." : "Yes, cancel"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <section className="rounded-xl border border-red-300 bg-red-50/40 p-5">
           <h3 className="text-lg font-semibold text-red-700">Danger zone</h3>
@@ -550,7 +811,7 @@ export function WorkspaceSettingsPage() {
             Delete workspace permanently. This removes all tokens and history.
           </p>
           <div className="mt-4 flex flex-wrap items-end gap-3">
-            <div className="min-w-[280px] flex-1 space-y-1.5">
+            <div className="min-w-70 flex-1 space-y-1.5">
               <Label htmlFor="delete-confirm">Type workspace name to confirm</Label>
               <Input
                 id="delete-confirm"
