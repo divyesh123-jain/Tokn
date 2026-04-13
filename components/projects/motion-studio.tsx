@@ -51,7 +51,7 @@ export function MotionStudio({
                 />
               </>
             ) : (
-              <SectionPanel section={activeSection} />
+              <SectionPanel section={activeSection} onSectionChange={setActiveSection} />
             )}
           </div>
         </div>

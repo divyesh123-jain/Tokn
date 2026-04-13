@@ -7,6 +7,11 @@ import {
   deleteTokenRemote as deleteTokenRemoteImpl,
   patchTokenRemote as patchTokenRemoteImpl,
 } from "@/lib/token-client";
+import {
+  createImportedShadcnToken,
+  nextUniqueTokenName,
+  parseShadcnComponentNames,
+} from "@/lib/shadcn-import";
 import { createAutoTokenName, getTokenNameValidationError } from "@/lib/token-name";
 import { useTokenStore } from "@/lib/token-store";
 import {
@@ -275,4 +280,71 @@ export async function softDeleteTokenAction(id: string) {
   } catch {
     // toast handled in token-client
   }
+}
+
+export async function importShadcnComponentsAction(rawInput: string) {
+  if (!canEditWorkspaceTokens()) {
+    deps().notifyError("Viewer role is read-only");
+    return { imported: 0, skipped: 0 };
+  }
+
+  const components = parseShadcnComponentNames(rawInput);
+  if (components.length === 0) {
+    deps().notifyError("No supported shadcn components found in input");
+    return { imported: 0, skipped: 0 };
+  }
+
+  const store = useTokenStore.getState();
+  const ws = store.workspaceId;
+  const takenNames = new Set(store.tokens.map((token) => token.name));
+  const createdTokens: MotionTokenItem[] = [];
+  let skipped = 0;
+
+  for (const component of components) {
+    const mapped = createImportedShadcnToken(component);
+    const name = nextUniqueTokenName(mapped.category, mapped.descriptor, takenNames);
+    const nameError = getTokenNameValidationError(name);
+    if (nameError) {
+      skipped += 1;
+      continue;
+    }
+
+    const body = buildCreateTokenBody({
+      ...mapped.patch,
+      category: mapped.category,
+      name,
+      deprecated: false,
+      delayMs: 0,
+    });
+
+    if (!ws) {
+      createdTokens.push({
+        ...body,
+        id: deps().randomId(),
+        pendingSync: false,
+        updatedAt: deps().nowIso(),
+      });
+      continue;
+    }
+
+    try {
+      const created = await deps().createTokenRemote(ws, body);
+      createdTokens.push({ ...created, pendingSync: false });
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  if (createdTokens.length === 0) {
+    return { imported: 0, skipped: components.length };
+  }
+
+  const lastId = createdTokens[createdTokens.length - 1]?.id ?? null;
+  useTokenStore.setState((s) => ({
+    tokens: [...s.tokens, ...createdTokens],
+    selectedId: lastId ?? s.selectedId,
+    replayKey: s.replayKey + 1,
+  }));
+
+  return { imported: createdTokens.length, skipped };
 }

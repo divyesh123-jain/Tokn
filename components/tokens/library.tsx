@@ -64,6 +64,29 @@ function tokenTransition(token: MotionTokenItem) {
   };
 }
 
+function getTokenDescriptor(tokenName: string) {
+  const parts = tokenName.toLowerCase().split(".");
+  return parts[1] ?? "";
+}
+
+function getPreviewKind(item: MotionTokenItem) {
+  const descriptor = getTokenDescriptor(item.name);
+
+  if (["button", "toggle", "switch", "checkbox", "radio", "tabs"].some((word) => descriptor.includes(word))) {
+    return "button" as const;
+  }
+  if (["card", "accordion"].some((word) => descriptor.includes(word))) {
+    return "card" as const;
+  }
+  if (["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu"].some((word) => descriptor.includes(word))) {
+    return "modal" as const;
+  }
+  if (item.category === "feedback") return "line" as const;
+  if (item.category === "spring") return "dot" as const;
+  if (item.category === "exit") return "exit" as const;
+  return "enter" as const;
+}
+
 export function TokenLibrary() {
   const {
     tokens,
@@ -234,6 +257,7 @@ export function TokenLibrary() {
                 {group.items.map((token) => {
                   const category = categoryConfig[token.category];
                   const selected = selectedId === token.id;
+                  const previewKind = getPreviewKind(token);
                   return (
                     <Card
                       key={token.id}
@@ -283,8 +307,42 @@ export function TokenLibrary() {
                             }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             transition={tokenTransition(token)}
-                            className="h-full w-full rounded-md bg-primary/15"
-                          />
+                            className="flex h-full w-full items-center justify-center"
+                          >
+                            {previewKind === "button" ? (
+                              <div className="w-28 rounded-md border border-primary/20 bg-background px-3 py-1.5 text-center text-[11px] font-medium text-foreground shadow-sm">
+                                Continue
+                              </div>
+                            ) : null}
+                            {previewKind === "card" ? (
+                              <div className="w-30 rounded-lg border border-border bg-background p-2.5 shadow-sm">
+                                <div className="h-2 w-12 rounded bg-primary/15" />
+                                <div className="mt-2 h-1.5 w-18 rounded bg-muted" />
+                                <div className="mt-1.5 h-1.5 w-14 rounded bg-muted" />
+                              </div>
+                            ) : null}
+                            {previewKind === "modal" ? (
+                              <div className="relative h-full w-full max-w-28 rounded-md bg-black/5 p-1.5">
+                                <div className="absolute inset-0 rounded-md bg-black/10" />
+                                <div className="relative mx-auto mt-2.5 w-22 rounded-md border border-border bg-background p-2 shadow-sm">
+                                  <div className="h-1.5 w-10 rounded bg-primary/15" />
+                                  <div className="mt-1.5 h-1.5 w-16 rounded bg-muted" />
+                                </div>
+                              </div>
+                            ) : null}
+                            {previewKind === "dot" ? (
+                              <div className="h-10 w-10 rounded-md bg-primary/30" />
+                            ) : null}
+                            {previewKind === "line" ? (
+                              <div className="h-1 w-16 rounded-full bg-primary/40" />
+                            ) : null}
+                            {previewKind === "exit" ? (
+                              <div className="h-1 w-20 rounded-full bg-muted-foreground/60" />
+                            ) : null}
+                            {previewKind === "enter" ? (
+                              <div className="h-9 w-9 rounded-md border-2 border-primary/40 bg-transparent" />
+                            ) : null}
+                          </motion.div>
                         </div>
 
                         <div className="mt-4 flex items-center gap-2">

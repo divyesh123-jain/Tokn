@@ -23,12 +23,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { categoryConfig } from "@/lib/tokn-constants";
+import { Textarea } from "@/components/ui/textarea";
+import { categoryConfig, type MotionTokenItem } from "@/lib/tokn-constants";
 import { useTokenStore } from "@/lib/token-store";
 import {
   createTokenAction,
   deleteTokenAction,
   duplicateTokenAction,
+  importShadcnComponentsAction,
   softDeleteTokenAction,
 } from "@/lib/token-actions";
 import { flushWorkspaceTokenPatches } from "@/lib/workspace-token-sync";
@@ -39,7 +41,36 @@ import { SwitchPill } from "./ui-controls";
 
 import type { StudioSection } from "./shared";
 
-export function SectionPanel({ section }: { section: StudioSection }) {
+function getTokenDescriptor(tokenName: string) {
+  const parts = tokenName.toLowerCase().split(".");
+  return parts[1] ?? "";
+}
+
+function getPreviewKind(item: MotionTokenItem) {
+  const descriptor = getTokenDescriptor(item.name);
+
+  if (["button", "toggle", "switch", "checkbox", "radio", "tabs"].some((word) => descriptor.includes(word))) {
+    return "button" as const;
+  }
+  if (["card", "accordion"].some((word) => descriptor.includes(word))) {
+    return "card" as const;
+  }
+  if (["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu"].some((word) => descriptor.includes(word))) {
+    return "modal" as const;
+  }
+  if (item.category === "feedback") return "line" as const;
+  if (item.category === "spring") return "dot" as const;
+  if (item.category === "exit") return "exit" as const;
+  return "enter" as const;
+}
+
+export function SectionPanel({
+  section,
+  onSectionChange,
+}: {
+  section: StudioSection;
+  onSectionChange: (section: StudioSection) => void;
+}) {
   const {
     tokens,
     workspaceRole,
@@ -56,6 +87,8 @@ export function SectionPanel({ section }: { section: StudioSection }) {
   const [deployingLibrary, setDeployingLibrary] = useState(false);
   const [durationOffsetPercent, setDurationOffsetPercent] = useState(0);
   const [durationOverrideMs, setDurationOverrideMs] = useState(300);
+  const [shadcnInput, setShadcnInput] = useState("");
+  const [importingShadcn, setImportingShadcn] = useState(false);
 
   const libraryTokens = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -126,6 +159,31 @@ export function SectionPanel({ section }: { section: StudioSection }) {
     }
     if (duplicated > 0) {
       toast.success(`Duplicated ${duplicated} token${duplicated > 1 ? "s" : ""}`);
+    }
+  }
+
+  async function importShadcnComponents() {
+    if (!canEditTokens || importingShadcn) return;
+    setImportingShadcn(true);
+    try {
+      const result = await importShadcnComponentsAction(shadcnInput);
+      if (result.imported > 0) {
+        toast.success(
+          `Imported ${result.imported} token${result.imported === 1 ? "" : "s"} from shadcn components`,
+        );
+        setSearch("");
+        onSectionChange("physics-lab");
+        if (result.skipped > 0) {
+          toast.message(`${result.skipped} component${result.skipped === 1 ? "" : "s"} could not be imported`);
+        }
+        setShadcnInput("");
+        return;
+      }
+      if (result.skipped > 0) {
+        toast.error("Could not import shadcn components");
+      }
+    } finally {
+      setImportingShadcn(false);
     }
   }
 
@@ -263,6 +321,36 @@ export function SectionPanel({ section }: { section: StudioSection }) {
             </div>
           </div>
 
+          <div className="mb-5 rounded-xl border border-border bg-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Import shadcn components</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Paste shadcn add commands, component names, or import paths to generate animation-ready tokens.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  void importShadcnComponents();
+                }}
+                disabled={!canEditTokens || importingShadcn || shadcnInput.trim().length === 0}
+              >
+                {importingShadcn ? "Importing..." : "Import components"}
+              </Button>
+            </div>
+            <Textarea
+              value={shadcnInput}
+              onChange={(event) => setShadcnInput(event.target.value)}
+              placeholder="npx shadcn@latest add button card dialog\n@/components/ui/dropdown-menu"
+              className="mt-3 min-h-24 font-mono text-xs"
+            />
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              After importing, tune token values in this panel and use Publish in the top header to release a versioned animation system.
+            </p>
+          </div>
+
           <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="text-[42px] font-semibold italic leading-none tracking-tight text-foreground">Standard Library</h1>
@@ -295,6 +383,7 @@ export function SectionPanel({ section }: { section: StudioSection }) {
               const selected = librarySelection.includes(item.id);
               const hovered = libraryHoveredId === item.id;
               const showCardActions = canEditTokens && (hovered || selected);
+              const previewKind = getPreviewKind(item);
 
               return (
                 <div
@@ -395,17 +484,42 @@ export function SectionPanel({ section }: { section: StudioSection }) {
                             }),
                         duration: hovered ? undefined : 0,
                       }}
-                      className={cn(
-                        "bg-[#534ab7] transition-all duration-200",
-                        item.category === "spring"
-                          ? "h-12 w-12 rounded-md"
-                          : item.category === "feedback"
-                            ? "h-1 w-16 rounded-full"
-                            : item.category === "exit"
-                              ? "h-1 w-20 rounded-full bg-[#6f6d7f]"
-                              : "h-9 w-9 rounded-md border-2 border-[#534ab7] bg-transparent",
-                      )}
-                    />
+                      className="flex h-full w-full items-center justify-center p-5 transition-all duration-200"
+                    >
+                      {previewKind === "button" ? (
+                        <div className="w-28 rounded-md border border-[#534ab7]/30 bg-white px-3 py-2 text-center text-[11px] font-semibold text-[#3f388e] shadow-sm">
+                          Continue
+                        </div>
+                      ) : null}
+                      {previewKind === "card" ? (
+                        <div className="w-30 rounded-lg border border-border bg-white p-3 shadow-sm">
+                          <div className="h-2 w-14 rounded bg-[#534ab7]/15" />
+                          <div className="mt-2 h-1.5 w-20 rounded bg-muted" />
+                          <div className="mt-1.5 h-1.5 w-16 rounded bg-muted" />
+                        </div>
+                      ) : null}
+                      {previewKind === "modal" ? (
+                        <div className="relative h-22 w-full max-w-32 rounded-md bg-black/5 p-2">
+                          <div className="absolute inset-0 rounded-md bg-black/10" />
+                          <div className="relative mx-auto mt-3 w-24 rounded-md border border-border bg-white p-2 shadow-sm">
+                            <div className="h-1.5 w-12 rounded bg-[#534ab7]/15" />
+                            <div className="mt-1.5 h-1.5 w-18 rounded bg-muted" />
+                          </div>
+                        </div>
+                      ) : null}
+                      {previewKind === "dot" ? (
+                        <div className="h-12 w-12 rounded-md bg-[#534ab7]" />
+                      ) : null}
+                      {previewKind === "line" ? (
+                        <div className="h-1 w-16 rounded-full bg-[#534ab7]" />
+                      ) : null}
+                      {previewKind === "exit" ? (
+                        <div className="h-1 w-20 rounded-full bg-[#6f6d7f]" />
+                      ) : null}
+                      {previewKind === "enter" ? (
+                        <div className="h-9 w-9 rounded-md border-2 border-[#534ab7] bg-transparent" />
+                      ) : null}
+                    </motion.div>
                   </div>
 
                   <div className="flex items-start justify-between gap-4">

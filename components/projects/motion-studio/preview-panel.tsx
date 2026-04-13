@@ -25,6 +25,29 @@ type PreviewPanelProps = {
   relativeUnits: boolean;
 };
 
+function getTokenDescriptor(tokenName: string) {
+  const parts = tokenName.toLowerCase().split(".");
+  return parts[1] ?? "";
+}
+
+function getPreviewKind(tokenName: string, category: string) {
+  const descriptor = getTokenDescriptor(tokenName);
+
+  if (["button", "toggle", "switch", "checkbox", "radio", "tabs"].some((word) => descriptor.includes(word))) {
+    return "button" as const;
+  }
+  if (["card", "accordion"].some((word) => descriptor.includes(word))) {
+    return "card" as const;
+  }
+  if (["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu"].some((word) => descriptor.includes(word))) {
+    return "modal" as const;
+  }
+  if (category === "feedback") return "toast" as const;
+  if (category === "spring") return "dot" as const;
+  if (category === "exit") return "exit" as const;
+  return "enter" as const;
+}
+
 export function PreviewPanel({ additiveMotion, relativeUnits }: PreviewPanelProps) {
   const { replayKey, replay, workspaceRole, workspaceId } = useTokenStore();
   const token = useSelectedToken();
@@ -207,9 +230,60 @@ export function PreviewPanel({ additiveMotion, relativeUnits }: PreviewPanelProp
                   }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={tokenTransition(token)}
-                  className="flex h-24.5 w-24.5 items-center justify-center rounded-xl bg-[#4c3dc9] text-[44px] font-bold leading-none text-white shadow-[0_18px_35px_-22px_rgba(31,28,86,0.8)]"
+                  className="flex h-32 w-32 items-center justify-center"
                 >
-                  tk
+                  {(() => {
+                    const previewKind = getPreviewKind(token.name, token.category);
+
+                    if (previewKind === "button") {
+                      return (
+                        <div className="rounded-md border border-[#4c3dc9]/25 bg-white px-4 py-2 text-[13px] font-semibold text-[#372d89] shadow-[0_10px_24px_-16px_rgba(31,28,86,0.4)]">
+                          Continue
+                        </div>
+                      );
+                    }
+
+                    if (previewKind === "card") {
+                      return (
+                        <div className="w-28 rounded-lg border border-border bg-white p-3 shadow-[0_16px_30px_-24px_rgba(31,28,86,0.35)]">
+                          <div className="h-2 w-12 rounded bg-[#4c3dc9]/18" />
+                          <div className="mt-2 h-1.5 w-18 rounded bg-muted" />
+                          <div className="mt-1.5 h-1.5 w-14 rounded bg-muted" />
+                        </div>
+                      );
+                    }
+
+                    if (previewKind === "modal") {
+                      return (
+                        <div className="relative h-28 w-32 rounded-xl bg-black/8 p-2">
+                          <div className="absolute inset-0 rounded-xl bg-black/14 backdrop-blur-[1px]" />
+                          <div className="relative mx-auto mt-4 w-24 rounded-lg border border-border bg-white p-3 shadow-[0_18px_30px_-24px_rgba(31,28,86,0.45)]">
+                            <div className="h-2 w-12 rounded bg-[#4c3dc9]/18" />
+                            <div className="mt-2 h-1.5 w-16 rounded bg-muted" />
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (previewKind === "toast") {
+                      return (
+                        <div className="w-28 rounded-lg border border-[#4c3dc9]/15 bg-[#111827] px-3 py-2 text-left text-[11px] text-white shadow-[0_18px_30px_-22px_rgba(31,28,86,0.65)]">
+                          <p className="font-semibold">Saved</p>
+                          <p className="mt-0.5 text-white/70">Your changes were applied.</p>
+                        </div>
+                      );
+                    }
+
+                    if (previewKind === "dot") {
+                      return <div className="h-12 w-12 rounded-xl bg-[#4c3dc9]" />;
+                    }
+
+                    if (previewKind === "exit") {
+                      return <div className="h-1.5 w-20 rounded-full bg-[#7a7891]" />;
+                    }
+
+                    return <div className="h-9 w-9 rounded-xl border-2 border-[#4c3dc9] bg-transparent" />;
+                  })()}
                 </motion.div>
 
                 <Button
