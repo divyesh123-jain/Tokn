@@ -17,6 +17,13 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -36,7 +43,12 @@ import {
 import { flushWorkspaceTokenPatches } from "@/lib/workspace-token-sync";
 import { cn } from "@/lib/utils";
 
-import { EASING_PRESETS, normalizeEasing, toFramerEasing } from "./shared";
+import {
+  EASING_PRESETS,
+  FRONTEND_ANIMATION_PRESETS,
+  normalizeEasing,
+  toFramerEasing,
+} from "./shared";
 import { SwitchPill } from "./ui-controls";
 
 import type { StudioSection } from "./shared";
@@ -89,6 +101,7 @@ export function SectionPanel({
   const [durationOverrideMs, setDurationOverrideMs] = useState(300);
   const [shadcnInput, setShadcnInput] = useState("");
   const [importingShadcn, setImportingShadcn] = useState(false);
+  const [shadcnModalOpen, setShadcnModalOpen] = useState(false);
 
   const libraryTokens = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -269,8 +282,9 @@ export function SectionPanel({
 
   if (section === "library") {
     return (
-      <main className="flex min-w-0 flex-1 flex-col bg-muted/30">
-        <div className="border-b border-border px-6 py-4">
+      <>
+        <main className="flex min-w-0 flex-1 flex-col bg-muted/30">
+          <div className="border-b border-border px-6 py-4">
           <div className="mb-5 flex items-center justify-between gap-3 rounded-xl bg-card px-4 py-3 text-foreground">
             <div className="flex items-center gap-4">
               <p className="text-sm font-semibold">{librarySelection.length} tokens selected</p>
@@ -321,36 +335,6 @@ export function SectionPanel({
             </div>
           </div>
 
-          <div className="mb-5 rounded-xl border border-border bg-card p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Import shadcn components</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Paste shadcn add commands, component names, or import paths to generate animation-ready tokens.
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  void importShadcnComponents();
-                }}
-                disabled={!canEditTokens || importingShadcn || shadcnInput.trim().length === 0}
-              >
-                {importingShadcn ? "Importing..." : "Import components"}
-              </Button>
-            </div>
-            <Textarea
-              value={shadcnInput}
-              onChange={(event) => setShadcnInput(event.target.value)}
-              placeholder="npx shadcn@latest add button card dialog\n@/components/ui/dropdown-menu"
-              className="mt-3 min-h-24 font-mono text-xs"
-            />
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              After importing, tune token values in this panel and use Publish in the top header to release a versioned animation system.
-            </p>
-          </div>
-
           <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="text-[42px] font-semibold italic leading-none tracking-tight text-foreground">Standard Library</h1>
@@ -358,6 +342,17 @@ export function SectionPanel({
               <p className="text-[13px] text-muted-foreground">Precise, calibrated, and production-ready.</p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 rounded-md border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted"
+                onClick={() => {
+                  setShadcnModalOpen(true);
+                }}
+                disabled={!canEditTokens}
+              >
+                Import shadcn
+              </Button>
               <div className="relative transition-all duration-200">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground transition-colors duration-200" />
                 <Input
@@ -564,8 +559,61 @@ export function SectionPanel({
               <Plus className="h-5 w-5" />
             </Button>
           ) : null}
-        </div>
-      </main>
+          </div>
+        </main>
+
+        <Dialog open={shadcnModalOpen} onOpenChange={setShadcnModalOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Import shadcn components</DialogTitle>
+            </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Paste shadcn add commands, component names, or import paths. You can also pick a preset below and it will fill the input for you.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {FRONTEND_ANIMATION_PRESETS.map((preset) => (
+                <Button
+                  key={preset.key}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShadcnInput(preset.label)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+
+            <Textarea
+              value={shadcnInput}
+              onChange={(event) => setShadcnInput(event.target.value)}
+              placeholder="npx shadcn@latest add button card dialog\n@/components/ui/dropdown-menu"
+              className="min-h-28 font-mono text-xs"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              After importing, tune token values in this panel and use Publish in the top header to release a versioned animation system.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShadcnModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                void importShadcnComponents();
+              }}
+              disabled={!canEditTokens || importingShadcn || shadcnInput.trim().length === 0}
+            >
+              {importingShadcn ? "Importing..." : "Import components"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+        </Dialog>
+      </>
     );
   }
 

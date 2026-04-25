@@ -3,12 +3,14 @@ import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb } from "@/db";
-import { motionTokens } from "@/db/schema";
+import { motionTokens, workspaceReleases } from "@/db/schema";
 import {
   getSessionUser,
   requireWorkspaceRole,
   WorkspaceRoleError,
 } from "@/lib/auth-helpers";
+import { generateWorkspaceSdkJson } from "@/lib/codegen";
+import { motionTokenDbRowToItem, type MotionTokenDbRow } from "@/lib/token-db";
 
 const uuidParam = z.string().uuid();
 const versionSchema = z
@@ -25,6 +27,11 @@ const publishSchema = z.discriminatedUnion("mode", [
     version: versionSchema,
   }),
 ]);
+
+function isMissingReleaseTableError(error: unknown) {
+  const e = error as { code?: string; cause?: { code?: string } };
+  return e?.code === "42P01" || e?.cause?.code === "42P01";
+}
 
 export async function POST(
   req: Request,
@@ -61,6 +68,23 @@ export async function POST(
 
   const db = getDb();
   const now = new Date();
+  const activeRows = await db
+    .select()
+    .from(motionTokens)
+    .where(and(eq(motionTokens.workspaceId, workspaceId), eq(motionTokens.deprecated, false)));
+
+  if (activeRows.length === 0) {
+    return NextResponse.json({ error: "No active tokens to publish" }, { status: 400 });
+  }
+
+  const activeTokens = activeRows
+    .map((row) =>
+      motionTokenDbRowToItem(
+        row as unknown as MotionTokenDbRow & { updatedAt?: Date | string | null },
+      ),
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   let version = "";
   if (payload.data.mode === "new") {
     version = payload.data.version.startsWith("v")
@@ -107,6 +131,28 @@ export async function POST(
 
   if (updated.length === 0) {
     return NextResponse.json({ error: "No active tokens to publish" }, { status: 400 });
+  }
+
+  try {
+    const snapshot = generateWorkspaceSdkJson({
+      workspaceId,
+      version,
+      generatedAtIso: now.toISOString(),
+      tokens: activeTokens,
+    });
+    await db.insert(workspaceReleases).values({
+      workspaceId,
+      version,
+      tokenCount: activeTokens.length,
+      snapshot,
+      publishedBy: user.userId,
+      publishedAt: now,
+      createdAt: now,
+    });
+  } catch (error) {
+    if (!isMissingReleaseTableError(error)) {
+      throw error;
+    }
   }
 
   return NextResponse.json({

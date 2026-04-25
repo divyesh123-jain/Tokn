@@ -2,7 +2,12 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { getDb } from "@/db";
 import { users, workspaces, workspaceInvites, workspaceMembers } from "@/db/schema";
-import type { WorkspaceInviteStatus, WorkspaceRole } from "@/lib/workspace-types";
+import { getSupabaseEmailDeliveryStatus, sendEmailViaSupabaseSmtp } from "@/lib/email";
+import type {
+  InviteEmailDeliveryStatus,
+  WorkspaceInviteStatus,
+  WorkspaceRole,
+} from "@/lib/workspace-types";
 
 export const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
 
@@ -12,6 +17,10 @@ export function normalizeInviteEmail(email: string) {
 
 export function createInviteToken() {
   return crypto.randomUUID();
+}
+
+export function getInviteEmailDeliveryStatus(): InviteEmailDeliveryStatus {
+  return getSupabaseEmailDeliveryStatus();
 }
 
 export function getInviteStatus(invite: {
@@ -122,36 +131,18 @@ export async function sendInviteEmail(args: {
   expiresAt: Date;
 }) {
   type EmailDeliveryResult =
-    | { ok: true; provider: "resend" | "none"; skipped?: boolean }
-    | { ok: false; provider: "resend"; error: string; status?: number };
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? process.env.RESEND_FROM ?? "Tokn <noreply@tokn.so>";
-  if (!apiKey) {
-    // TODO: If we move invite emails to Supabase later, route this through that provider here.
-    // For now we allow invite creation without outbound email so teams can continue onboarding.
-    return {
-      ok: true,
-      provider: "none",
-      skipped: true,
-    } satisfies EmailDeliveryResult;
-  }
+    | { ok: true; provider: "supabase" | "none"; skipped?: boolean }
+    | { ok: false; provider: "supabase"; error: string; status?: number };
 
   const roleLabel = args.role === "editor" ? "Editor" : "Viewer";
   const subject = `${args.inviterName} invited you to ${args.workspaceName} workspace on Tokn`;
   const expiresInHours = Math.round((args.expiresAt.getTime() - Date.now()) / (60 * 60 * 1000));
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [args.to],
-        subject,
-        html: `
+    const result = await sendEmailViaSupabaseSmtp({
+      to: args.to,
+      subject,
+      html: `
         <div style="font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; line-height: 1.5; color: #111827;">
           <p>Hi,</p>
           <p><strong>${escapeHtml(args.inviterName)}</strong> invited you to join the <strong>${escapeHtml(args.workspaceName)}</strong> workspace on Tokn as an <strong>${roleLabel}</strong>.</p>
@@ -160,35 +151,24 @@ export async function sendInviteEmail(args: {
           <p style="color:#6b7280;font-size:14px;">If you did not expect this invite, you can safely ignore it.</p>
         </div>
       `,
-        text: [
-          `Hi,`,
-          `${args.inviterName} invited you to join the ${args.workspaceName} workspace on Tokn as an ${roleLabel}.`,
-          `Accept invite: ${args.inviteUrl}`,
-          `This invite expires in ${expiresInHours} hours.`,
-        ].join("\n\n"),
-      }),
+      text: [
+        `Hi,`,
+        `${args.inviterName} invited you to join the ${args.workspaceName} workspace on Tokn as an ${roleLabel}.`,
+        `Accept invite: ${args.inviteUrl}`,
+        `This invite expires in ${expiresInHours} hours.`,
+      ].join("\n\n"),
     });
 
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      return {
-        ok: false,
-        provider: "resend",
-        error: `Email provider rejected invite (${res.status})${body ? `: ${body}` : ""}`,
-        status: 502,
-      } satisfies EmailDeliveryResult;
-    }
-
-    return { ok: true, provider: "resend" } satisfies EmailDeliveryResult;
+    return result;
   } catch (error) {
     const e = error as { code?: string; cause?: { code?: string } };
     const code = e?.code ?? e?.cause?.code;
     return {
       ok: false,
-      provider: "resend",
+      provider: "supabase",
       error: code
-        ? `Email delivery failed (${code}). Check network and email provider settings.`
-        : "Email delivery failed. Check network and email provider settings.",
+        ? `Email delivery failed (${code}). Check Supabase SMTP settings.`
+        : "Email delivery failed. Check Supabase SMTP settings.",
       status: 503,
     } satisfies EmailDeliveryResult;
   }
@@ -200,27 +180,12 @@ export async function sendWorkspaceJoinEmail(args: {
   memberName: string;
   role: WorkspaceRole;
 }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL ?? process.env.RESEND_FROM ?? "Tokn <noreply@tokn.so>";
-  if (!apiKey) {
-    return { ok: false as const };
-  }
-
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [args.to],
-        subject: `${args.memberName} joined ${args.workspaceName} workspace on Tokn`,
-        text: `${args.memberName} just joined ${args.workspaceName} workspace on Tokn as ${args.role}.`,
-      }),
+    return await sendEmailViaSupabaseSmtp({
+      to: args.to,
+      subject: `${args.memberName} joined ${args.workspaceName} workspace on Tokn`,
+      text: `${args.memberName} just joined ${args.workspaceName} workspace on Tokn as ${args.role}.`,
     });
-    return { ok: res.ok as true | false };
   } catch {
     return { ok: false as const };
   }

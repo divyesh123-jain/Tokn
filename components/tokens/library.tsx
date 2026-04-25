@@ -24,6 +24,7 @@ import {
   type MotionTokenCategory,
   type MotionTokenItem,
 } from "@/lib/tokn-constants";
+import { trackProductEvent } from "@/lib/analytics";
 import { getTokenNameValidationError } from "@/lib/token-name";
 import { useSelectedToken, useTokenStore } from "@/lib/token-store";
 import { deleteTokenAction, saveTokenNameAction } from "@/lib/token-actions";
@@ -90,6 +91,7 @@ function getPreviewKind(item: MotionTokenItem) {
 export function TokenLibrary() {
   const {
     tokens,
+    workspaceId,
     searchQuery,
     setSearch,
     selectedId,
@@ -105,6 +107,8 @@ export function TokenLibrary() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
+  const [sdkCopied, setSdkCopied] = useState(false);
+  const [sdkCopying, setSdkCopying] = useState(false);
 
   useEffect(() => {
     if (selectedToken) setNameDraft(selectedToken.name);
@@ -150,6 +154,17 @@ export function TokenLibrary() {
     [filtered],
   );
 
+  const latestPublishedVersion = useMemo(() => {
+    const published = tokens.filter((t) => !t.deprecated && t.publishedVersion && t.publishedAt);
+    if (published.length === 0) return null;
+    const latest = [...published].sort((a, b) => {
+      const aMs = new Date(a.publishedAt as string).getTime();
+      const bMs = new Date(b.publishedAt as string).getTime();
+      return bMs - aMs;
+    })[0];
+    return latest.publishedVersion ?? null;
+  }, [tokens]);
+
   async function copyToken(token: MotionTokenItem) {
     await navigator.clipboard.writeText(transformToken(token).framerMotion);
     setCopiedTokenId(token.id);
@@ -177,6 +192,48 @@ export function TokenLibrary() {
     window.setTimeout(() => setShared(false), 1500);
   }
 
+  async function copyWorkspaceSdk() {
+    if (!workspaceId) {
+      toast.error("Open a workspace project to export SDK");
+      return;
+    }
+    if (!latestPublishedVersion) {
+      toast.error("Publish this workspace first to export a versioned SDK");
+      return;
+    }
+
+    setSdkCopying(true);
+    try {
+      const version = encodeURIComponent(latestPublishedVersion);
+      const res = await fetch(
+        `/api/workspaces/${workspaceId}/sdk/${version}?format=typescript`,
+        workspaceApiFetchInit,
+      );
+      const json = (await res.json().catch(() => null)) as
+        | { content?: string; error?: string }
+        | null;
+      if (!res.ok || !json?.content) {
+        toast.error(json?.error ?? "Could not export SDK");
+        return;
+      }
+      await navigator.clipboard.writeText(json.content);
+      setSdkCopied(true);
+      window.setTimeout(() => setSdkCopied(false), 1500);
+      toast.success(`SDK copied for ${latestPublishedVersion}`);
+      void trackProductEvent({
+        eventName: "sdk_export_copied",
+        workspaceId,
+        payload: {
+          version: latestPublishedVersion,
+          format: "typescript",
+          source: "token_library",
+        },
+      });
+    } finally {
+      setSdkCopying(false);
+    }
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <section className="space-y-5">
@@ -199,6 +256,19 @@ export function TokenLibrary() {
                   <>
                     <ExternalLink className="h-3.5 w-3.5" />
                     Share library
+                  </>
+                )}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void copyWorkspaceSdk()} disabled={sdkCopying}>
+                {sdkCopied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-green-600" />
+                    SDK copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    {sdkCopying ? "Exporting..." : "Copy SDK"}
                   </>
                 )}
               </Button>

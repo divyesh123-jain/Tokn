@@ -107,3 +107,35 @@ export const motionTokens = pgTable(
   ],
 );
 
+export const workspaceReleases = pgTable(
+  "workspace_releases",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    version: text("version").notNull(),
+    tokenCount: integer("token_count").notNull(),
+    snapshot: text("snapshot").notNull(),
+    publishedBy: uuid("published_by").references(() => users.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    unique("workspace_releases_workspace_version_published_at_unique").on(
+      t.workspaceId,
+      t.version,
+      t.publishedAt,
+    ),
+  ],
+);
+
+export const productEvents = pgTable("product_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "set null" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  eventName: varchar("event_name", { length: 120 }).notNull(),
+  payload: text("payload"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+});
+

@@ -5,7 +5,13 @@ import { z } from "zod";
 import { getDb } from "@/db";
 import { users, workspaces, workspaceInvites } from "@/db/schema";
 import { getSessionUser, requireWorkspaceRole, WorkspaceRoleError } from "@/lib/auth-helpers";
-import { createInviteToken, INVITE_TTL_MS, normalizeInviteEmail, sendInviteEmail } from "@/lib/workspace-invites";
+import {
+  createInviteToken,
+  getInviteEmailDeliveryStatus,
+  INVITE_TTL_MS,
+  normalizeInviteEmail,
+  sendInviteEmail,
+} from "@/lib/workspace-invites";
 
 const uuidParam = z.string().uuid();
 
@@ -152,11 +158,16 @@ export async function PATCH(
 
   const emailSent = !sendResult.skipped;
   const emailNotice = sendResult.skipped
-    ? "Invite was refreshed, but email delivery is disabled until an email provider is configured."
+    ? "Invite was refreshed, but email delivery is disabled until Supabase SMTP is configured."
     : undefined;
 
   const updated = await loadInvite(parsedWorkspaceId.data, parsedInviteId.data);
-  return NextResponse.json({ invite: serializeInvite(updated), emailSent, emailNotice });
+  return NextResponse.json({
+    invite: serializeInvite(updated),
+    emailSent,
+    emailNotice,
+    emailDelivery: getInviteEmailDeliveryStatus(),
+  });
 }
 
 export async function DELETE(

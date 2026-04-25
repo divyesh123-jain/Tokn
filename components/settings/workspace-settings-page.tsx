@@ -24,11 +24,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { trackProductEvent } from "@/lib/analytics";
 import { scheduleRouterAction } from "@/lib/safe-router";
 import { formatInviteCountdown } from "@/lib/invite-display";
 import { sanitizeWorkspaceSlug } from "@/lib/workspace-slug";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import type {
+  InviteEmailDeliveryStatus,
   WorkspaceInvite,
   WorkspaceMember,
   WorkspaceRole,
@@ -57,6 +59,7 @@ export function WorkspaceSettingsPage() {
   const [workspace, setWorkspace] = useState<WorkspaceDetail | null>(null);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [pendingInvites, setPendingInvites] = useState<WorkspaceInvite[]>([]);
+  const [emailDelivery, setEmailDelivery] = useState<InviteEmailDeliveryStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
 
@@ -168,18 +171,23 @@ export function WorkspaceSettingsPage() {
             workspaceApiFetchInit,
           );
           const invitesJson = (await invitesRes.json().catch(() => null)) as
-            | { invites?: WorkspaceInvite[]; error?: string }
+            | { invites?: WorkspaceInvite[]; error?: string; emailDelivery?: InviteEmailDeliveryStatus }
             | null;
           if (!invitesRes.ok) {
             toast.error(invitesJson?.error ?? "Could not load pending invites");
             setPendingInvites([]);
+            setEmailDelivery(null);
           } else {
             setPendingInvites(invitesJson?.invites ?? []);
+            setEmailDelivery(invitesJson?.emailDelivery ?? null);
           }
+        } else {
+          setEmailDelivery(null);
         }
       } else {
         setMembers([]);
         setPendingInvites([]);
+        setEmailDelivery(null);
       }
 
       setLoading(false);
@@ -362,6 +370,7 @@ export function WorkspaceSettingsPage() {
             resent?: boolean;
             emailSent?: boolean;
             emailNotice?: string;
+            emailDelivery?: InviteEmailDeliveryStatus;
           }
         | null;
       if (!res.ok || !json?.invite) {
@@ -370,6 +379,7 @@ export function WorkspaceSettingsPage() {
       }
 
       setPendingInvites(json.invites ?? []);
+      setEmailDelivery(json.emailDelivery ?? null);
       setInviteEmail("");
       setInviteRole("editor");
       if (json.emailSent === false) {
@@ -377,6 +387,15 @@ export function WorkspaceSettingsPage() {
       } else {
         toast.success(json.resent ? "Invite resent ✓" : "Invite sent ✓");
       }
+
+      void trackProductEvent({
+        eventName: json.resent ? "invite_resent" : "invite_sent",
+        workspaceId: workspace.id,
+        payload: {
+          role: nextRole,
+          emailSent: json.emailSent !== false,
+        },
+      });
     } finally {
       setInviting(false);
     }
@@ -391,7 +410,13 @@ export function WorkspaceSettingsPage() {
         method: "PATCH",
       });
       const json = (await res.json().catch(() => null)) as
-        | { invite?: WorkspaceInvite; error?: string; emailSent?: boolean; emailNotice?: string }
+        | {
+            invite?: WorkspaceInvite;
+            error?: string;
+            emailSent?: boolean;
+            emailNotice?: string;
+            emailDelivery?: InviteEmailDeliveryStatus;
+          }
         | null;
       if (!res.ok || !json?.invite) {
         toast.error(json?.error ?? "Could not resend invite");
@@ -399,11 +424,21 @@ export function WorkspaceSettingsPage() {
       }
 
       setPendingInvites((current) => current.map((item) => (item.id === json.invite?.id ? json.invite as WorkspaceInvite : item)));
+      setEmailDelivery(json.emailDelivery ?? null);
       if (json.emailSent === false) {
         toast.message(json.emailNotice ?? "Invite was refreshed. Email delivery is currently disabled.");
       } else {
         toast.success("Resent ✓");
       }
+
+      void trackProductEvent({
+        eventName: "invite_resent",
+        workspaceId: workspace.id,
+        payload: {
+          role: invite.role,
+          emailSent: json.emailSent !== false,
+        },
+      });
     } finally {
       setInviteActionId(null);
     }
@@ -428,6 +463,13 @@ export function WorkspaceSettingsPage() {
       setPendingInvites((current) => current.map((item) => (item.id === json.invite?.id ? json.invite as WorkspaceInvite : item)));
       setCancelInviteTarget(null);
       toast.success("Invite cancelled");
+      void trackProductEvent({
+        eventName: "invite_cancelled",
+        workspaceId: workspace.id,
+        payload: {
+          role: invite.role,
+        },
+      });
     } finally {
       setInviteActionId(null);
     }
@@ -597,6 +639,26 @@ export function WorkspaceSettingsPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Owners can invite members, remove members, and change roles.
             </p>
+
+            {canManageWorkspace && emailDelivery ? (
+              <div className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                    Invite email delivery
+                  </span>
+                  <Badge variant={emailDelivery.configured ? "default" : "outline"}>
+                    {emailDelivery.configured ? "Configured" : "Not configured"}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    Provider: {emailDelivery.provider}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {emailDelivery.notice}
+                  {emailDelivery.fromEmail ? ` From: ${emailDelivery.fromEmail}` : ""}
+                </p>
+              </div>
+            ) : null}
 
             <div className="mt-4 space-y-2">
               {members.length === 0 ? (

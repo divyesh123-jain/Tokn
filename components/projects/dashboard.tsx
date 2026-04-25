@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Settings, Share2, Users } from "lucide-react";
+import { ArrowLeft, Copy, Download, Loader2, Settings, Share2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { MotionStudio } from "@/components/projects/motion-studio";
@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemePicker } from "@/components/theme/theme-picker";
+import { trackProductEvent } from "@/lib/analytics";
 import {
   hasPendingPatches,
   leaveWorkspaceSession,
@@ -34,6 +35,9 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [workspace, setWorkspace] = React.useState<WorkspaceSummary | null>(null);
   const [publishOpen, setPublishOpen] = React.useState(false);
+  const [exportOpen, setExportOpen] = React.useState(false);
+  const [exporting, setExporting] = React.useState(false);
+  const [exportFormat, setExportFormat] = React.useState<"typescript" | "json">("typescript");
   const [publishMode, setPublishMode] = React.useState<"existing" | "new">("new");
   const [version, setVersion] = React.useState("1.0.0");
   const [publishing, setPublishing] = React.useState(false);
@@ -234,9 +238,75 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
       const pinnedUrl = `${base}/preview/${slug}/v/${encodeURIComponent(json.publishedVersion)}`;
       await navigator.clipboard.writeText(pinnedUrl);
       toast.success(`Published ${json.publishedVersion}. Pinned URL copied.`);
+      void trackProductEvent({
+        eventName: "workspace_published",
+        workspaceId: workspace.id,
+        payload: {
+          version: json.publishedVersion,
+          tokenCount: Number(tokens.filter((t) => !t.deprecated).length),
+          mode: publishMode,
+        },
+      });
       setPublishOpen(false);
     } finally {
       setPublishing(false);
+    }
+  }
+
+  async function exportWorkspaceSdk(mode: "copy" | "download") {
+    if (!workspace || exporting || !publishState.currentVersion) return;
+    setExporting(true);
+    try {
+      const version = encodeURIComponent(publishState.currentVersion);
+      const url = `/api/workspaces/${workspace.id}/sdk/${version}?format=${exportFormat}`;
+      const res = await fetch(url, workspaceApiFetchInit);
+      const json = (await res.json().catch(() => null)) as
+        | { filename?: string; content?: string; error?: string }
+        | null;
+
+      if (!res.ok || !json?.content || !json.filename) {
+        toast.error(json?.error ?? "Could not export SDK");
+        return;
+      }
+
+      if (mode === "copy") {
+        await navigator.clipboard.writeText(json.content);
+        toast.success(`${exportFormat === "json" ? "JSON" : "TypeScript"} SDK copied`);
+        void trackProductEvent({
+          eventName: "sdk_export_copied",
+          workspaceId: workspace.id,
+          payload: {
+            version: publishState.currentVersion,
+            format: exportFormat,
+          },
+        });
+        return;
+      }
+
+      const blob = new Blob([json.content], {
+        type: exportFormat === "json" ? "application/json;charset=utf-8" : "text/plain;charset=utf-8",
+      });
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = json.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(href);
+      toast.success(`${json.filename} downloaded`);
+      void trackProductEvent({
+        eventName: "sdk_export_downloaded",
+        workspaceId: workspace.id,
+        payload: {
+          version: publishState.currentVersion,
+          format: exportFormat,
+          filename: json.filename,
+        },
+      });
+      setExportOpen(false);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -295,6 +365,16 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
           >
             <Share2 className="h-3.5 w-3.5" />
             Share
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden gap-1.5 sm:inline-flex"
+            disabled={!publishState.currentVersion}
+            onClick={() => setExportOpen(true)}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export SDK
           </Button>
           <Link
             href={`/settings?workspaceId=${workspace.id}`}
@@ -371,6 +451,61 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
             </Button>
             <Button onClick={() => void publishWorkspace()} disabled={publishing}>
               {publishing ? "Publishing..." : "Publish"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export SDK</DialogTitle>
+          </DialogHeader>
+
+          {!publishState.currentVersion ? (
+            <p className="text-sm text-muted-foreground">
+              Publish this workspace first to export a versioned SDK snapshot.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Exporting snapshot <span className="font-mono">{publishState.currentVersion}</span>
+              </p>
+              <div className="space-y-2">
+                <Label>Format</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={exportFormat === "typescript" ? "default" : "outline"}
+                    onClick={() => setExportFormat("typescript")}
+                  >
+                    TypeScript
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={exportFormat === "json" ? "default" : "outline"}
+                    onClick={() => setExportFormat("json")}
+                  >
+                    JSON
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportOpen(false)} disabled={exporting}>
+              Close
+            </Button>
+            <Button onClick={() => void exportWorkspaceSdk("copy")} disabled={exporting || !publishState.currentVersion}>
+              <Copy className="h-3.5 w-3.5" />
+              {exporting ? "Working..." : "Copy"}
+            </Button>
+            <Button onClick={() => void exportWorkspaceSdk("download")} disabled={exporting || !publishState.currentVersion}>
+              <Download className="h-3.5 w-3.5" />
+              {exporting ? "Working..." : "Download"}
             </Button>
           </DialogFooter>
         </DialogContent>

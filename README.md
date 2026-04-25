@@ -288,3 +288,77 @@ Pick one and we implement directly:
 - Typography system and theme tokens
 - SDK generator output format
 - Enforcement rule spec (`eslint-plugin-tokn`)
+
+## Deployment Readiness
+
+### 1) Environment setup
+
+- Copy `.env.example` to `.env.local` for local development.
+- In production, set all required variables in your hosting provider:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `DATABASE_URL` (or `POSTGRES_URL` / `SUPABASE_DB_URL`)
+  - `NEXT_PUBLIC_APP_URL` (and optionally `NEXT_PUBLIC_SITE_URL`, `SITE_URL`)
+- Optional but recommended:
+  - `UPSTASH_REDIS_REST_URL`
+  - `UPSTASH_REDIS_REST_TOKEN`
+  - `SUPABASE_SMTP_HOST`
+  - `SUPABASE_SMTP_PORT`
+  - `SUPABASE_SMTP_USER`
+  - `SUPABASE_SMTP_PASSWORD`
+  - `SUPABASE_FROM_EMAIL`
+
+### 2) CI checks
+
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Runs on push/PR:
+  - `npm ci`
+  - `npm run lint`
+  - `npm run build`
+
+### 3) Production checklist
+
+- Verify auth callback URLs match deployment domain.
+- Verify database connection and migrations are applied.
+- Verify invite flow works with Supabase SMTP enabled.
+- Verify rate limiting is active by setting Upstash env vars.
+- Verify publish flow and pinned preview URLs.
+
+### 4) P2 migrations and checks
+
+- Run `npm run db:push` after pulling latest changes to create:
+  - `workspace_releases` (publish snapshots + release diffs)
+  - `product_events` (analytics starter events)
+- Run governance starter check:
+  - `npm run governance:check`
+  - Remediate hardcoded motion values by replacing literals with token-driven values.
+
+## P2 Features Implemented
+
+### Release Details And Diffs
+
+- Publish now stores release snapshots in `workspace_releases`.
+- Releases UI compares consecutive snapshots and shows:
+  - added tokens
+  - changed tokens
+  - removed tokens
+  - newly deprecated tokens (breaking risk)
+- If the release table is not migrated yet, UI falls back gracefully to basic release rows.
+
+### Governance Rule Starter
+
+- Added script: `npm run governance:check`
+- Scans app/component/lib source for common hardcoded motion literals:
+  - duration literals
+  - delay literals
+  - easing literals
+  - CSS transition milliseconds
+
+### Analytics Starter
+
+- Added endpoint: `POST /api/analytics/events`
+- Added client helper for non-blocking event dispatch.
+- Tracked starter product events:
+  - workspace publish
+  - SDK export copy/download
+  - invite sent/resent/cancelled

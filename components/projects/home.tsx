@@ -219,6 +219,14 @@ export function ProjectsHome() {
     }
   }
 
+  async function shareProjectsHome() {
+    const base =
+      typeof window !== "undefined" ? window.location.origin : "https://tokn.so";
+    const url = `${base}/projects`;
+    await navigator.clipboard.writeText(url);
+    toast.success("Projects link copied");
+  }
+
   const displayName = authUser?.fullName?.trim() || authUser?.email || workspaceLabel;
 
   return (
@@ -313,7 +321,12 @@ export function ProjectsHome() {
             <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
               Unlimited projects and shared libraries when you are ready.
             </p>
-            <Button size="sm" className="mt-3 w-full rounded-lg" variant="default">
+            <Button
+              size="sm"
+              className="mt-3 w-full rounded-lg"
+              variant="default"
+              onClick={() => scheduleRouterAction(() => router.push("/pricing"))}
+            >
               View plans
             </Button>
           </div>
@@ -353,7 +366,14 @@ export function ProjectsHome() {
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="rounded-lg gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg gap-1.5"
+              onClick={() => {
+                void shareProjectsHome();
+              }}
+            >
               <Share2 className="h-3.5 w-3.5" />
               Share
             </Button>

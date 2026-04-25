@@ -21,6 +21,13 @@ export type WorkspaceMember = {
 
 export type WorkspaceInviteStatus = "pending" | "expired" | "cancelled" | "declined" | "accepted";
 
+export type InviteEmailDeliveryStatus = {
+  configured: boolean;
+  provider: "supabase" | "none";
+  fromEmail: string | null;
+  notice: string;
+};
+
 export type WorkspaceInvite = {
   id: string;
   workspaceId: string;

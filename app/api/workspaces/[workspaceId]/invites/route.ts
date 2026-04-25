@@ -8,6 +8,7 @@ import { getSessionUser, requireWorkspaceRole, WorkspaceRoleError } from "@/lib/
 import { formatInviteCountdown } from "@/lib/invite-display";
 import {
   createInviteToken,
+  getInviteEmailDeliveryStatus,
   INVITE_TTL_MS,
   normalizeInviteEmail,
   sendInviteEmail,
@@ -118,7 +119,7 @@ export async function GET(
   }
 
   const invites = await serializeInvites(workspaceId);
-  return NextResponse.json({ invites });
+  return NextResponse.json({ invites, emailDelivery: getInviteEmailDeliveryStatus() });
 }
 
 export async function POST(
@@ -266,7 +267,7 @@ export async function POST(
 
   const emailSent = !sendResult.skipped;
   const emailNotice = sendResult.skipped
-    ? "Invite created. Email delivery is disabled until an email provider is configured."
+    ? "Invite created. Email delivery is disabled until Supabase SMTP is configured."
     : undefined;
 
   const invites = await serializeInvites(workspaceId);
@@ -278,5 +279,6 @@ export async function POST(
     resent: Boolean(existingInvite[0]),
     emailSent,
     emailNotice,
+    emailDelivery: getInviteEmailDeliveryStatus(),
   });
 }
