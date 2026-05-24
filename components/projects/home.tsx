@@ -25,6 +25,7 @@ import {
   Users,
 } from "lucide-react";
 
+import { AvatarWithSource } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -53,6 +54,7 @@ type AuthUser = {
   id: string;
   email: string;
   fullName: string | null;
+  avatarUrl: string | null;
 };
 
 const NAV = [
@@ -238,9 +240,12 @@ export function ProjectsHome() {
               className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-semibold hover:bg-sidebar-accent/80"
               aria-label="Open account menu"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                {initialsFromLabel(displayName)}
-              </span>
+              <AvatarWithSource
+                src={authUser?.avatarUrl}
+                alt=""
+                fallback={initialsFromLabel(displayName)}
+                className="size-8"
+              />
               <span className="min-w-0 flex-1 truncate">{displayName}</span>
               <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
             </DropdownMenuTrigger>
@@ -316,21 +321,7 @@ export function ProjectsHome() {
         </nav>
 
         <div className="border-t border-sidebar-border p-3">
-          <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
-            <div className="text-xs font-semibold">Upgrade</div>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-              Unlimited projects and shared libraries when you are ready.
-            </p>
-            <Button
-              size="sm"
-              className="mt-3 w-full rounded-lg"
-              variant="default"
-              onClick={() => scheduleRouterAction(() => router.push("/pricing"))}
-            >
-              View plans
-            </Button>
-          </div>
-          <div className="mt-2 flex gap-1">
+          <div className="flex gap-1">
             <Link
               href="/settings"
               className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs text-muted-foreground hover:bg-muted"

@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 
-import { TOKEN_DEFAULTS, type MotionTokenItem } from "@/lib/tokn-constants";
+import { TOKEN_DEFAULTS, type MotionTokenCategory, type MotionTokenItem } from "@/lib/tokn-constants";
 import {
   buildCreateTokenBody,
   createTokenRemote as createTokenRemoteImpl,
@@ -282,7 +282,10 @@ export async function softDeleteTokenAction(id: string) {
   }
 }
 
-export async function importShadcnComponentsAction(rawInput: string) {
+export async function importShadcnComponentsAction(
+  rawInput: string,
+  options?: { categoryOverride?: MotionTokenCategory },
+) {
   if (!canEditWorkspaceTokens()) {
     deps().notifyError("Viewer role is read-only");
     return { imported: 0, skipped: 0 };
@@ -302,7 +305,8 @@ export async function importShadcnComponentsAction(rawInput: string) {
 
   for (const component of components) {
     const mapped = createImportedShadcnToken(component);
-    const name = nextUniqueTokenName(mapped.category, mapped.descriptor, takenNames);
+    const category = options?.categoryOverride ?? mapped.category;
+    const name = nextUniqueTokenName(category, mapped.descriptor, takenNames);
     const nameError = getTokenNameValidationError(name);
     if (nameError) {
       skipped += 1;
@@ -311,7 +315,7 @@ export async function importShadcnComponentsAction(rawInput: string) {
 
     const body = buildCreateTokenBody({
       ...mapped.patch,
-      category: mapped.category,
+      category,
       name,
       deprecated: false,
       delayMs: 0,

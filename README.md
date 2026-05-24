@@ -37,6 +37,10 @@ Tokn lets product teams define, share, and enforce motion tokens across their ap
 - Design system owners who need policy and enforcement.
 - PMs and founders who need polished UX without custom motion workflows.
 
+## User feature summary
+
+Implemented product behavior from an end-user perspective: [docs/USER_FEATURES.md](docs/USER_FEATURES.md). Possible UX and product upgrades: [docs/USER_EXPERIENCE_OPPORTUNITIES.md](docs/USER_EXPERIENCE_OPPORTUNITIES.md).
+
 ## Information Architecture
 
 1. Workspaces
@@ -106,6 +110,9 @@ type MotionToken = {
 ### 1) Token Authoring
 
 - Create, edit, deprecate, and group motion tokens.
+- Browse by UI component (descriptor after the dot) or by motion category; search matches names, inferred tags (overlay, control, …), easing, and category labels.
+- Optional import category override when pasting shadcn components (otherwise category is inferred per component).
+- Import dialog includes the full shadcn registry (aligned with ui.shadcn.com components) with a filterable picker to append slugs to the import field.
 - Rich fields for duration, easing curves, spring physics, transforms, and opacity.
 - Intent descriptions and usage guidance per token.
 

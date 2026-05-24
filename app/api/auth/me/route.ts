@@ -24,16 +24,23 @@ export async function GET() {
     return NextResponse.json({ user: null }, { status: 401 });
   }
 
+  const meta = user.user_metadata ?? {};
   const fullName =
-    typeof user.user_metadata?.full_name === "string"
-      ? user.user_metadata.full_name.trim()
-      : "";
+    typeof meta.full_name === "string" ? meta.full_name.trim() : "";
+
+  const avatarUrl =
+    typeof meta.avatar_url === "string" && meta.avatar_url.trim()
+      ? meta.avatar_url.trim()
+      : typeof meta.picture === "string" && meta.picture.trim()
+        ? meta.picture.trim()
+        : null;
 
   return NextResponse.json({
     user: {
       id: user.id,
       email: user.email ?? "",
       fullName: fullName || null,
+      avatarUrl,
       emailVerified: Boolean(user.email_confirmed_at),
     },
   });

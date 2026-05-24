@@ -30,6 +30,12 @@ import { useSelectedToken, useTokenStore } from "@/lib/token-store";
 import { deleteTokenAction, saveTokenNameAction } from "@/lib/token-actions";
 import { transformToken } from "@/lib/codegen";
 import { buildWorkspacePreviewSlug } from "@/lib/workspace-slug";
+import {
+  humanizeTokenDescriptor,
+  inferTokenUiTags,
+  tokenDescriptorFromName,
+  tokenMatchesSearch,
+} from "@/lib/token-display";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 
 const EASING_MAP: Record<string, [number, number, number, number]> = {
@@ -65,13 +71,8 @@ function tokenTransition(token: MotionTokenItem) {
   };
 }
 
-function getTokenDescriptor(tokenName: string) {
-  const parts = tokenName.toLowerCase().split(".");
-  return parts[1] ?? "";
-}
-
 function getPreviewKind(item: MotionTokenItem) {
-  const descriptor = getTokenDescriptor(item.name);
+  const descriptor = tokenDescriptorFromName(item.name);
 
   if (["button", "toggle", "switch", "checkbox", "radio", "tabs"].some((word) => descriptor.includes(word))) {
     return "button" as const;
@@ -79,7 +80,11 @@ function getPreviewKind(item: MotionTokenItem) {
   if (["card", "accordion"].some((word) => descriptor.includes(word))) {
     return "card" as const;
   }
-  if (["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu"].some((word) => descriptor.includes(word))) {
+  if (
+    ["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu", "sidebar", "context-menu", "navigation-menu", "menubar"].some(
+      (word) => descriptor.includes(word),
+    )
+  ) {
     return "modal" as const;
   }
   if (item.category === "feedback") return "line" as const;
@@ -104,6 +109,7 @@ export function TokenLibrary() {
   const [activeCategory, setActiveCategory] = useState<MotionTokenCategory | "all">(
     "all",
   );
+  const [libraryGroupMode, setLibraryGroupMode] = useState<"category" | "component">("component");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
@@ -131,28 +137,45 @@ export function TokenLibrary() {
     nameDraft.trim() !== (selectedToken.name || "").trim();
 
   const filtered = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
     return tokens.filter((token) => {
-      const matchesQuery =
-        query.length === 0 ||
-        token.name.toLowerCase().includes(query) ||
-        token.easing.toLowerCase().includes(query);
+      const matchesQuery = tokenMatchesSearch(token, searchQuery);
       const matchesCategory =
         activeCategory === "all" || token.category === activeCategory;
       return matchesQuery && matchesCategory;
     });
   }, [tokens, searchQuery, activeCategory]);
 
-  const grouped = useMemo(
-    () =>
-      categoryOrder
+  const groupBlocks = useMemo(() => {
+    if (libraryGroupMode === "category") {
+      return categoryOrder
         .map((category) => ({
-          category,
+          kind: "category" as const,
+          id: category,
+          title: category,
           items: filtered.filter((token) => token.category === category),
         }))
-        .filter((group) => group.items.length > 0),
-    [filtered],
-  );
+        .filter((g) => g.items.length > 0);
+    }
+    const map = new Map<string, MotionTokenItem[]>();
+    for (const t of filtered) {
+      const key = tokenDescriptorFromName(t.name);
+      const bucket = key === "" ? "__" : key;
+      if (!map.has(bucket)) map.set(bucket, []);
+      map.get(bucket)!.push(t);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) =>
+        humanizeTokenDescriptor(a === "__" ? "" : a).localeCompare(
+          humanizeTokenDescriptor(b === "__" ? "" : b),
+        ),
+      )
+      .map(([bucket, items]) => ({
+        kind: "component" as const,
+        id: bucket,
+        title: humanizeTokenDescriptor(bucket === "__" ? "" : bucket),
+        items: [...items].sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+  }, [filtered, libraryGroupMode]);
 
   const latestPublishedVersion = useMemo(() => {
     const published = tokens.filter((t) => !t.deprecated && t.publishedVersion && t.publishedAt);
@@ -292,19 +315,36 @@ export function TokenLibrary() {
                 </Button>
               ))}
             </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">Group by</span>
+              <Button
+                size="sm"
+                variant={libraryGroupMode === "component" ? "default" : "secondary"}
+                onClick={() => setLibraryGroupMode("component")}
+              >
+                Component
+              </Button>
+              <Button
+                size="sm"
+                variant={libraryGroupMode === "category" ? "default" : "secondary"}
+                onClick={() => setLibraryGroupMode("category")}
+              >
+                Category
+              </Button>
+            </div>
             <div className="relative mt-3">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-9"
                 value={searchQuery}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by token name or easing"
+                placeholder="Search name, component, tags, easing…"
               />
             </div>
           </CardHeader>
         </Card>
 
-        {grouped.length === 0 ? (
+        {groupBlocks.length === 0 ? (
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">
@@ -313,11 +353,11 @@ export function TokenLibrary() {
             </CardContent>
           </Card>
         ) : (
-          grouped.map((group) => (
-            <div key={group.category} className="space-y-3">
+          groupBlocks.map((group) => (
+            <div key={`${group.kind}-${group.id}`} className="space-y-3">
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                  {group.category}
+                  {group.title}
                 </h3>
                 <span className="text-xs text-muted-foreground">
                   {group.items.length} tokens
@@ -328,6 +368,7 @@ export function TokenLibrary() {
                   const category = categoryConfig[token.category];
                   const selected = selectedId === token.id;
                   const previewKind = getPreviewKind(token);
+                  const tags = inferTokenUiTags(token.name, token.category);
                   return (
                     <Card
                       key={token.id}
@@ -346,9 +387,24 @@ export function TokenLibrary() {
                             onClick={() => selectToken(token.id)}
                             type="button"
                           >
-                            <p className="font-mono text-sm text-foreground">
+                            <p className="text-sm font-semibold text-foreground">
+                              {humanizeTokenDescriptor(tokenDescriptorFromName(token.name))}
+                            </p>
+                            <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                               {token.name}
                             </p>
+                            {tags.length > 0 ? (
+                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                {tags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
                             <p className="mt-1 text-xs text-muted-foreground">
                               {token.isSpring
                                 ? `spring ${token.springStiffness}/${token.springDamping}`

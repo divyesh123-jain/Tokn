@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { categoryConfig, type MotionTokenItem } from "@/lib/tokn-constants";
+import { categoryConfig, motionCategories, type MotionTokenCategory, type MotionTokenItem } from "@/lib/tokn-constants";
 import { useTokenStore } from "@/lib/token-store";
 import {
   createTokenAction,
@@ -41,6 +41,13 @@ import {
   softDeleteTokenAction,
 } from "@/lib/token-actions";
 import { flushWorkspaceTokenPatches } from "@/lib/workspace-token-sync";
+import { appendShadcnSlugToImportInput, SHADCN_COMPONENT_SLUGS } from "@/lib/shadcn-import";
+import {
+  humanizeTokenDescriptor,
+  inferTokenUiTags,
+  tokenDescriptorFromName,
+  tokenMatchesSearch,
+} from "@/lib/token-display";
 import { cn } from "@/lib/utils";
 
 import {
@@ -49,17 +56,12 @@ import {
   normalizeEasing,
   toFramerEasing,
 } from "./shared";
-import { SwitchPill } from "./ui-controls";
 
 import type { StudioSection } from "./shared";
-
-function getTokenDescriptor(tokenName: string) {
-  const parts = tokenName.toLowerCase().split(".");
-  return parts[1] ?? "";
-}
+import { SwitchPill } from "./ui-controls";
 
 function getPreviewKind(item: MotionTokenItem) {
-  const descriptor = getTokenDescriptor(item.name);
+  const descriptor = tokenDescriptorFromName(item.name);
 
   if (["button", "toggle", "switch", "checkbox", "radio", "tabs"].some((word) => descriptor.includes(word))) {
     return "button" as const;
@@ -67,7 +69,11 @@ function getPreviewKind(item: MotionTokenItem) {
   if (["card", "accordion"].some((word) => descriptor.includes(word))) {
     return "card" as const;
   }
-  if (["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu"].some((word) => descriptor.includes(word))) {
+  if (
+    ["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu", "sidebar", "context-menu", "navigation-menu", "menubar"].some(
+      (word) => descriptor.includes(word),
+    )
+  ) {
     return "modal" as const;
   }
   if (item.category === "feedback") return "line" as const;
@@ -102,15 +108,39 @@ export function SectionPanel({
   const [shadcnInput, setShadcnInput] = useState("");
   const [importingShadcn, setImportingShadcn] = useState(false);
   const [shadcnModalOpen, setShadcnModalOpen] = useState(false);
+  const [shadcnSlugFilter, setShadcnSlugFilter] = useState("");
+  const [librarySortMode, setLibrarySortMode] = useState<"category" | "component">("component");
+  const [importCategoryMode, setImportCategoryMode] = useState<"auto" | MotionTokenCategory>("auto");
+
+  const filteredShadcnSlugs = useMemo(() => {
+    const q = shadcnSlugFilter.trim().toLowerCase();
+    if (!q) return [...SHADCN_COMPONENT_SLUGS];
+    return SHADCN_COMPONENT_SLUGS.filter(
+      (slug) =>
+        slug.includes(q) || humanizeTokenDescriptor(slug).toLowerCase().replace(/\s+/g, " ").includes(q),
+    );
+  }, [shadcnSlugFilter]);
 
   const libraryTokens = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return tokens.filter((item) => {
+    const list = tokens.filter((item) => {
       if (item.deprecated) return false;
-      if (!q) return true;
-      return item.name.toLowerCase().includes(q);
+      return tokenMatchesSearch(item, searchQuery);
     });
-  }, [tokens, searchQuery]);
+    if (librarySortMode === "component") {
+      return [...list].sort((a, b) => {
+        const da = tokenDescriptorFromName(a.name);
+        const db = tokenDescriptorFromName(b.name);
+        const cmp = humanizeTokenDescriptor(da).localeCompare(humanizeTokenDescriptor(db));
+        if (cmp !== 0) return cmp;
+        return a.name.localeCompare(b.name);
+      });
+    }
+    return [...list].sort((a, b) => {
+      const c = a.category.localeCompare(b.category);
+      if (c !== 0) return c;
+      return a.name.localeCompare(b.name);
+    });
+  }, [tokens, searchQuery, librarySortMode]);
 
   useEffect(() => {
     setLibrarySelection((current) => current.filter((id) => libraryTokens.some((item) => item.id === id)));
@@ -179,7 +209,10 @@ export function SectionPanel({
     if (!canEditTokens || importingShadcn) return;
     setImportingShadcn(true);
     try {
-      const result = await importShadcnComponentsAction(shadcnInput);
+      const result = await importShadcnComponentsAction(
+        shadcnInput,
+        importCategoryMode === "auto" ? undefined : { categoryOverride: importCategoryMode },
+      );
       if (result.imported > 0) {
         toast.success(
           `Imported ${result.imported} token${result.imported === 1 ? "" : "s"} from shadcn components`,
@@ -358,14 +391,34 @@ export function SectionPanel({
                 <Input
                   value={searchQuery}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search tokens..."
+                  placeholder="Search name, component, tags…"
                   className="h-9 w-55 rounded-md border-border bg-card py-1 pl-8 pr-2 text-xs shadow-none transition-all duration-200 focus:border-primary focus:ring-1 focus:ring-primary/20"
                 />
               </div>
-              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-md border border-border bg-card text-muted-foreground">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title="Sort by motion category"
+                onClick={() => setLibrarySortMode("category")}
+                className={cn(
+                  "h-9 w-9 rounded-md border border-border bg-card text-muted-foreground hover:bg-muted",
+                  librarySortMode === "category" && "border-primary/50 text-foreground",
+                )}
+              >
                 <SlidersHorizontal className="h-4 w-4" />
               </Button>
-              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 rounded-md border border-border bg-card text-muted-foreground">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title="Sort by UI component"
+                onClick={() => setLibrarySortMode("component")}
+                className={cn(
+                  "h-9 w-9 rounded-md border border-border bg-card text-muted-foreground hover:bg-muted",
+                  librarySortMode === "component" && "border-primary/50 text-foreground",
+                )}
+              >
                 <LayoutGrid className="h-4 w-4" />
               </Button>
             </div>
@@ -518,8 +571,23 @@ export function SectionPanel({
                   </div>
 
                   <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-sm font-bold text-foreground">{item.name}</p>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="text-sm font-semibold leading-tight text-foreground">
+                        {humanizeTokenDescriptor(tokenDescriptorFromName(item.name))}
+                      </p>
+                      <p className="truncate font-mono text-[11px] text-muted-foreground">{item.name}</p>
+                      {inferTokenUiTags(item.name, item.category).length > 0 ? (
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                          {inferTokenUiTags(item.name, item.category).map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     <Badge
                       className="h-5 shrink-0 border-0 px-2 py-0 text-[9px] font-bold uppercase tracking-[0.9px]"
@@ -562,13 +630,24 @@ export function SectionPanel({
           </div>
         </main>
 
-        <Dialog open={shadcnModalOpen} onOpenChange={setShadcnModalOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Import shadcn components</DialogTitle>
-            </DialogHeader>
+        <Dialog
+          open={shadcnModalOpen}
+          onOpenChange={(open) => {
+            setShadcnModalOpen(open);
+            if (!open) {
+              setImportCategoryMode("auto");
+              setShadcnSlugFilter("");
+            }
+          }}
+        >
+          <DialogContent className="max-h-[90vh] gap-0 overflow-y-auto p-0 sm:max-w-2xl sm:p-0">
+            <div className="border-b px-6 py-4">
+              <DialogHeader className="space-y-1 text-left">
+                <DialogTitle>Import shadcn components</DialogTitle>
+              </DialogHeader>
+            </div>
 
-          <div className="space-y-4">
+            <div className="space-y-4 px-6 py-4">
             <p className="text-sm text-muted-foreground">
               Paste shadcn add commands, component names, or import paths. You can also pick a preset below and it will fill the input for you.
             </p>
@@ -587,18 +666,84 @@ export function SectionPanel({
               ))}
             </div>
 
-            <Textarea
-              value={shadcnInput}
-              onChange={(event) => setShadcnInput(event.target.value)}
-              placeholder="npx shadcn@latest add button card dialog\n@/components/ui/dropdown-menu"
-              className="min-h-28 font-mono text-xs"
-            />
-            <p className="text-[11px] text-muted-foreground">
-              After importing, tune token values in this panel and use Publish in the top header to release a versioned animation system.
-            </p>
-          </div>
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-foreground">Imported token category</p>
+              <div className="flex flex-wrap gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={importCategoryMode === "auto" ? "default" : "outline"}
+                  onClick={() => setImportCategoryMode("auto")}
+                >
+                  Auto
+                </Button>
+                {motionCategories.map((c) => (
+                  <Button
+                    key={c.key}
+                    type="button"
+                    size="sm"
+                    variant={importCategoryMode === c.key ? "default" : "outline"}
+                    onClick={() => setImportCategoryMode(c.key as MotionTokenCategory)}
+                  >
+                    {c.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Auto maps each component to enter or feedback. Choose a category to apply to every new token.
+              </p>
+            </div>
+            </div>
 
-          <DialogFooter>
+            <div className="space-y-3 border-t border-border px-6 py-4">
+              <p className="text-xs font-medium text-foreground">Registry components</p>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={shadcnSlugFilter}
+                  onChange={(event) => setShadcnSlugFilter(event.target.value)}
+                  placeholder="Filter by slug or name…"
+                  className="h-9 pl-8 text-xs"
+                />
+              </div>
+              <div className="max-h-52 overflow-y-auto rounded-lg border border-border bg-muted/15 p-2">
+                {filteredShadcnSlugs.length === 0 ? (
+                  <p className="py-6 text-center text-xs text-muted-foreground">No matching components</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                    {filteredShadcnSlugs.map((slug) => (
+                      <Button
+                        key={slug}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-auto min-h-9 justify-center whitespace-normal px-2 py-1.5 text-center text-[10px] font-medium leading-tight"
+                        onClick={() =>
+                          setShadcnInput((prev) => appendShadcnSlugToImportInput(prev, slug))
+                        }
+                      >
+                        {humanizeTokenDescriptor(slug)}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3 px-6 pb-5 pt-2">
+              <Textarea
+                value={shadcnInput}
+                onChange={(event) => setShadcnInput(event.target.value)}
+                placeholder="npx shadcn@latest add button card dialog\n@/components/ui/dropdown-menu"
+                className="min-h-28 font-mono text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                After importing, tune token values in this panel and use Publish in the top header to release a versioned animation system.
+              </p>
+            </div>
+
+            <div className="border-t border-border px-6 py-4">
+              <DialogFooter className="gap-2 sm:justify-end">
             <Button variant="outline" onClick={() => setShadcnModalOpen(false)}>
               Cancel
             </Button>
@@ -610,7 +755,8 @@ export function SectionPanel({
             >
               {importingShadcn ? "Importing..." : "Import components"}
             </Button>
-          </DialogFooter>
+              </DialogFooter>
+            </div>
         </DialogContent>
         </Dialog>
       </>
@@ -658,8 +804,13 @@ export function SectionPanel({
                   {selected ? <Check className="h-3 w-3 text-primary-foreground" /> : null}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-[11px] font-semibold text-foreground">{item.name}</p>
-                  <p className="mt-0.5 text-[10px] text-muted-foreground">{item.durationMs}ms • {item.isSpring ? "spring" : item.easing}</p>
+                  <p className="truncate text-[11px] font-semibold leading-tight text-foreground">
+                    {humanizeTokenDescriptor(tokenDescriptorFromName(item.name))}
+                  </p>
+                  <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">{item.name}</p>
+                  <p className="mt-0.5 text-[10px] text-muted-foreground">
+                    {item.durationMs}ms • {item.isSpring ? "spring" : item.easing}
+                  </p>
                 </div>
                 <span
                   className="h-2 w-2 rounded-full"

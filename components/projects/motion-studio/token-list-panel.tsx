@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +29,11 @@ import { Input } from "@/components/ui/input";
 import { recentUpdateLabel } from "@/lib/token-recent";
 import { getTokenNameValidationError } from "@/lib/token-name";
 import { cn } from "@/lib/utils";
+import {
+  humanizeTokenDescriptor,
+  tokenDescriptorFromName,
+  tokenMatchesSearch,
+} from "@/lib/token-display";
 import { categoryConfig, categoryOrder } from "@/lib/tokn-constants";
 import { useTokenStore } from "@/lib/token-store";
 import {
@@ -74,21 +80,44 @@ export function TokenListPanel({
   const [editingTokenId, setEditingTokenId] = useState<string | null>(null);
   const [inlineName, setInlineName] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [listGroupMode, setListGroupMode] = useState<"category" | "component">("component");
   const inlineInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return tokens.filter((t) => t.name.toLowerCase().includes(q));
+    return tokens.filter((t) => tokenMatchesSearch(t, searchQuery));
   }, [tokens, searchQuery]);
 
   const grouped = useMemo(() => {
-    return categoryOrder
-      .map((cat) => ({
-        category: cat,
-        items: filtered.filter((t) => t.category === cat),
-      }))
-      .filter((g) => g.items.length > 0);
-  }, [filtered]);
+    if (listGroupMode === "category") {
+      return categoryOrder
+        .map((cat) => ({
+          kind: "category" as const,
+          id: cat,
+          title: cat,
+          items: filtered.filter((t) => t.category === cat),
+        }))
+        .filter((g) => g.items.length > 0);
+    }
+    const map = new Map<string, typeof filtered>();
+    for (const t of filtered) {
+      const key = tokenDescriptorFromName(t.name);
+      const bucket = key === "" ? "__" : key;
+      if (!map.has(bucket)) map.set(bucket, []);
+      map.get(bucket)!.push(t);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) =>
+        humanizeTokenDescriptor(a === "__" ? "" : a).localeCompare(
+          humanizeTokenDescriptor(b === "__" ? "" : b),
+        ),
+      )
+      .map(([bucket, items]) => ({
+        kind: "component" as const,
+        id: bucket,
+        title: humanizeTokenDescriptor(bucket === "__" ? "" : bucket),
+        items: [...items].sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+  }, [filtered, listGroupMode]);
 
   const activeTokenCount = useMemo(
     () => tokens.filter((token) => !token.deprecated).length,
@@ -108,8 +137,6 @@ export function TokenListPanel({
     () => tokens.filter((token) => token.pendingSync && !token.deprecated).length,
     [tokens],
   );
-  const tokenLimit = 20;
-  const tokenLimitReached = activeTokenCount >= tokenLimit;
   const [deploying, setDeploying] = useState(false);
 
   useEffect(() => {
@@ -190,13 +217,13 @@ export function TokenListPanel({
   }
 
   return (
-    <aside className="flex w-62 shrink-0 flex-col border-r border-border bg-muted/30">
-      <div className="border-b border-border px-4 pb-4 pt-5">
+    <aside className="flex w-[288px] min-w-[272px] shrink-0 flex-col border-r border-border bg-muted/30">
+      <div className="shrink-0 space-y-4 border-b border-border px-4 pb-5 pt-5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspace</p>
-        <div className="mt-2 flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-            M
-          </div>
+        <div className="flex items-center gap-3">
+          <Avatar className="size-8 rounded-md">
+            <AvatarFallback className="rounded-md text-sm font-bold">M</AvatarFallback>
+          </Avatar>
           <div>
             <p className="text-[13px] font-semibold leading-tight text-foreground">
               {workspaceName?.trim() || "Workspace"}
@@ -205,7 +232,7 @@ export function TokenListPanel({
           </div>
         </div>
 
-        <div className="mt-4 space-y-1">
+        <div className="space-y-1.5">
           {SIDEBAR_ROUTES.map((item) => {
             const active = item.key === activeSection;
             const Icon = item.icon;
@@ -215,13 +242,13 @@ export function TokenListPanel({
                 type="button"
                 onClick={() => onSectionChange(item.key)}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[11px] font-semibold uppercase tracking-widest",
+                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-widest",
                   active
                     ? "bg-accent text-accent-foreground"
                     : "text-foreground hover:bg-muted",
                 )}
               >
-                <Icon className="h-3.5 w-3.5" />
+                <Icon className="h-3.5 w-3.5 shrink-0" />
                 {item.label}
               </button>
             );
@@ -229,15 +256,15 @@ export function TokenListPanel({
         </div>
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-auto px-3 py-4 transition-all duration-300">
-        {activeSection === "library" ? (
+      {activeSection === "library" ? (
+        <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 transition-all duration-300">
           <div>
-            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Categories</p>
-            <div className="space-y-1">
+            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Categories</p>
+            <div className="space-y-2">
               {categoryStats.map(({ category, count }) => (
                 <div
                   key={category}
-                  className="flex items-center justify-between rounded-md px-2 py-1.5 text-[11px] text-foreground"
+                  className="flex items-center justify-between rounded-lg px-2.5 py-2 text-[11px] text-foreground"
                 >
                   <div className="flex items-center gap-2">
                     <div
@@ -251,22 +278,46 @@ export function TokenListPanel({
               ))}
             </div>
           </div>
-        ) : (
-          <>
-            <div className="relative mb-3">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        </nav>
+      ) : (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0 space-y-4 border-b border-border/70 px-4 pb-4 pt-5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={searchQuery}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search token"
-                className="h-8 rounded-md border-border bg-muted/30 py-1 pl-8 pr-2 text-xs shadow-none"
+                placeholder="Name, component, tags…"
+                className="h-10 rounded-lg border-border bg-background py-2 pl-10 pr-3 text-xs shadow-sm"
               />
             </div>
-            <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={listGroupMode === "component" ? "default" : "secondary"}
+                className="h-8 rounded-md px-3 text-[10px] font-semibold uppercase tracking-wide"
+                onClick={() => setListGroupMode("component")}
+              >
+                By component
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={listGroupMode === "category" ? "default" : "secondary"}
+                className="h-8 rounded-md px-3 text-[10px] font-semibold uppercase tracking-wide"
+                onClick={() => setListGroupMode("category")}
+              >
+                By category
+              </Button>
+            </div>
+          </div>
+          <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
+            <div className="space-y-6">
               {grouped.map((group) => (
-                <div key={group.category}>
-                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                    {group.category}
+                <div key={`${group.kind}-${group.id}`}>
+                  <p className="mb-2.5 px-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    {group.title}
                   </p>
                   {group.items.map((token) => {
                     const selected = token.id === selectedId;
@@ -286,11 +337,11 @@ export function TokenListPanel({
                       >
                         <div
                           className={cn(
-                            "flex items-center gap-1 rounded-md px-2 py-1.5",
+                            "flex items-center gap-2 rounded-lg px-2.5 py-2.5",
                             selected ? "bg-accent" : "hover:bg-muted",
                           )}
                         >
-                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                          <div className="flex min-w-0 flex-1 items-center gap-2.5">
                             <div
                               className="h-2 w-2 shrink-0 rounded-full"
                               style={{ backgroundColor: selected ? "#4c3dc9" : config.color }}
@@ -314,35 +365,46 @@ export function TokenListPanel({
                                     cancelRename();
                                   }
                                 }}
-                                className="h-6 flex-1 rounded border border-border bg-background px-1.5 py-1 font-mono text-xs"
+                                className="h-8 flex-1 rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
                               />
                             ) : (
                               <button
                                 type="button"
-                                className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                                className="flex min-w-0 flex-1 flex-col gap-1 text-left"
                                 onClick={() => selectToken(token.id)}
                               >
+                                <div className="flex min-w-0 items-center gap-1.5">
+                                  <span
+                                    className={cn(
+                                      "min-w-0 flex-1 truncate text-[12px] font-semibold leading-snug",
+                                      selected ? "text-primary" : "text-foreground",
+                                    )}
+                                  >
+                                    {humanizeTokenDescriptor(tokenDescriptorFromName(token.name))}
+                                  </span>
+                                  {(() => {
+                                    const rel = recentUpdateLabel(token.updatedAt);
+                                    return rel ? (
+                                      <Badge
+                                        variant="secondary"
+                                        className="h-4 shrink-0 border-0 bg-accent px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-accent-foreground"
+                                        title={
+                                          token.updatedAt ? new Date(token.updatedAt).toLocaleString() : undefined
+                                        }
+                                      >
+                                        {rel}
+                                      </Badge>
+                                    ) : null;
+                                  })()}
+                                </div>
                                 <span
                                   className={cn(
-                                    "truncate text-[12px] font-medium",
-                                    selected ? "text-primary" : "text-foreground",
+                                    "truncate font-mono text-[10px] leading-snug text-muted-foreground",
+                                    selected ? "text-primary/80" : "",
                                   )}
                                 >
                                   {token.name || "untitled"}
                                 </span>
-
-                                {(() => {
-                                  const rel = recentUpdateLabel(token.updatedAt);
-                                  return rel ? (
-                                    <Badge
-                                      variant="secondary"
-                                      className="h-4 border-0 bg-accent px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-accent-foreground"
-                                      title={token.updatedAt ? new Date(token.updatedAt).toLocaleString() : undefined}
-                                    >
-                                      {rel}
-                                    </Badge>
-                                  ) : null;
-                                })()}
                               </button>
                             )}
                           </div>
@@ -357,7 +419,7 @@ export function TokenListPanel({
                                     size="icon"
                                     onClick={(event) => event.stopPropagation()}
                                     className={cn(
-                                      "h-6 w-6 rounded-md text-muted-foreground hover:bg-muted",
+                                      "h-7 w-7 shrink-0 rounded-md text-muted-foreground hover:bg-muted",
                                       showMenu ? "opacity-100" : "opacity-0",
                                     )}
                                   >
@@ -388,9 +450,9 @@ export function TokenListPanel({
                         </div>
 
                         {showDeleteConfirm ? (
-                          <div className="mt-1 rounded-md border border-border bg-card p-2 text-xs shadow-sm">
+                          <div className="mt-2 rounded-lg border border-border bg-card p-3 text-xs shadow-sm">
                             <p className="text-foreground">Delete {token.name || "untitled"}? This cannot be undone.</p>
-                            <div className="mt-2 flex justify-end gap-1.5">
+                            <div className="mt-3 flex justify-end gap-2">
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -416,11 +478,11 @@ export function TokenListPanel({
                 </div>
               ))}
             </div>
-          </>
-        )}
-      </nav>
+          </nav>
+        </div>
+      )}
 
-      <div className="space-y-2 border-t border-border p-3">
+      <div className="shrink-0 space-y-3 border-t border-border p-4">
         {canEditTokens ? (
           <Button
             type="button"
@@ -438,10 +500,8 @@ export function TokenListPanel({
             type="button"
             variant="ghost"
             onClick={() => {
-              if (tokenLimitReached) return;
               void createTokenAction();
             }}
-            disabled={tokenLimitReached}
             className="h-8 w-full justify-center rounded-md border border-dashed border-border bg-transparent text-xs font-medium text-foreground hover:bg-muted"
           >
             New Token

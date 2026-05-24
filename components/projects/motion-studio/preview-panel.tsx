@@ -39,7 +39,11 @@ function getPreviewKind(tokenName: string, category: string) {
   if (["card", "accordion"].some((word) => descriptor.includes(word))) {
     return "card" as const;
   }
-  if (["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu"].some((word) => descriptor.includes(word))) {
+  if (
+    ["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu", "sidebar", "context-menu", "navigation-menu", "menubar"].some(
+      (word) => descriptor.includes(word),
+    )
+  ) {
     return "modal" as const;
   }
   if (category === "feedback") return "toast" as const;

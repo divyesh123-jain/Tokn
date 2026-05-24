@@ -215,21 +215,6 @@ export async function POST(
   if (workspaceRows.length === 0) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
-  const workspace = workspaceRows[0];
-
-  if (workspace.kind === "individual") {
-    const countRows = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(motionTokens)
-      .where(and(eq(motionTokens.workspaceId, workspaceId), eq(motionTokens.deprecated, false)));
-    const activeCount = Number(countRows[0]?.count ?? 0);
-    if (activeCount >= 20) {
-      return NextResponse.json(
-        { error: "Token limit reached. Upgrade to Solo for unlimited tokens." },
-        { status: 403 },
-      );
-    }
-  }
 
   const payload = tokenCreateSchema.safeParse(await req.json());
   if (!payload.success) {

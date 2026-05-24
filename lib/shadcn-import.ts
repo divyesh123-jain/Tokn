@@ -1,7 +1,7 @@
 import { TOKEN_NAME_MAX_LENGTH } from "@/lib/token-name";
 import type { MotionTokenCategory, MotionTokenItem } from "@/lib/tokn-constants";
 
-const KNOWN_SHADCN_COMPONENTS = [
+export const SHADCN_COMPONENT_SLUGS = [
   "accordion",
   "alert",
   "alert-dialog",
@@ -10,6 +10,7 @@ const KNOWN_SHADCN_COMPONENTS = [
   "badge",
   "breadcrumb",
   "button",
+  "button-group",
   "calendar",
   "card",
   "carousel",
@@ -19,14 +20,24 @@ const KNOWN_SHADCN_COMPONENTS = [
   "combobox",
   "command",
   "context-menu",
+  "data-table",
+  "date-picker",
   "dialog",
+  "direction",
   "drawer",
   "dropdown-menu",
+  "empty",
+  "field",
   "form",
   "hover-card",
   "input",
+  "input-group",
+  "input-otp",
+  "item",
+  "kbd",
   "label",
   "menubar",
+  "native-select",
   "navigation-menu",
   "pagination",
   "popover",
@@ -37,9 +48,11 @@ const KNOWN_SHADCN_COMPONENTS = [
   "select",
   "separator",
   "sheet",
+  "sidebar",
   "skeleton",
   "slider",
   "sonner",
+  "spinner",
   "switch",
   "table",
   "tabs",
@@ -48,9 +61,10 @@ const KNOWN_SHADCN_COMPONENTS = [
   "toggle",
   "toggle-group",
   "tooltip",
+  "typography",
 ] as const;
 
-const KNOWN_COMPONENT_SET = new Set<string>(KNOWN_SHADCN_COMPONENTS);
+const KNOWN_COMPONENT_SET = new Set<string>(SHADCN_COMPONENT_SLUGS);
 
 const IMPORT_PATH_REGEX = /@\/components\/ui\/([a-z0-9-]+)/gi;
 
@@ -73,7 +87,6 @@ export function parseShadcnComponentNames(raw: string): string[] {
     }
   }
 
-  // Parse free-form input (commands, comma lists, snippets) by extracting token-like words.
   const fromWords = (raw.toLowerCase().match(/[a-z0-9-]+/g) ?? [])
     .map((part) => normalizeToken(part))
     .filter((part) => KNOWN_COMPONENT_SET.has(part));
@@ -93,7 +106,21 @@ function defaultTimedPreset(component: string): {
   category: MotionTokenCategory;
   patch: Partial<MotionTokenItem>;
 } {
-  if (["dialog", "sheet", "drawer", "popover", "dropdown-menu", "hover-card"].includes(component)) {
+  if (
+    [
+      "dialog",
+      "sheet",
+      "drawer",
+      "popover",
+      "dropdown-menu",
+      "hover-card",
+      "context-menu",
+      "navigation-menu",
+      "menubar",
+      "sidebar",
+      "date-picker",
+    ].includes(component)
+  ) {
     return {
       category: "enter",
       patch: {
@@ -107,7 +134,33 @@ function defaultTimedPreset(component: string): {
     };
   }
 
-  if (["button", "input", "select", "switch", "tabs", "textarea", "checkbox", "radio-group", "slider", "toggle", "toggle-group"].includes(component)) {
+  if (
+    [
+      "button",
+      "button-group",
+      "input",
+      "input-group",
+      "input-otp",
+      "native-select",
+      "select",
+      "switch",
+      "tabs",
+      "textarea",
+      "checkbox",
+      "radio-group",
+      "slider",
+      "toggle",
+      "toggle-group",
+      "combobox",
+      "field",
+      "item",
+      "label",
+      "badge",
+      "spinner",
+      "kbd",
+      "form",
+    ].includes(component)
+  ) {
     return {
       category: "feedback",
       patch: {
@@ -121,7 +174,7 @@ function defaultTimedPreset(component: string): {
     };
   }
 
-  if (["toast", "sonner", "alert", "alert-dialog"].includes(component)) {
+  if (["toast", "sonner", "alert", "alert-dialog", "empty", "skeleton"].includes(component)) {
     return {
       category: "feedback",
       patch: {
@@ -179,4 +232,12 @@ export function nextUniqueTokenName(
 
   taken.add(candidate);
   return candidate;
+}
+
+export function appendShadcnSlugToImportInput(current: string, slug: string): string {
+  const t = current.trimEnd();
+  const lower = t.toLowerCase();
+  const s = slug.toLowerCase();
+  if (new RegExp(`(?:^|[\\s,])${s}(?:$|[\\s,])`).test(lower)) return t;
+  return t ? `${t}\n${slug}` : slug;
 }
