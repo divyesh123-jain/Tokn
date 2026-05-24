@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   Boxes,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   FileText,
   FlaskConical,
@@ -11,7 +13,9 @@ import {
   LifeBuoy,
   MoreHorizontal,
   Pencil,
+  Plus,
   Search,
+  Send,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -54,6 +58,15 @@ const SIDEBAR_ROUTES = [
   { key: "manifest", label: "Manifest", icon: BookOpen },
 ] as const;
 
+const SECTION_HINT: Record<StudioSection, string> = {
+  library: "Overview by category",
+  "physics-lab": "Pick a token to preview and tune",
+  inspector: "Batch edit selected tokens",
+  manifest: "Workspace token manifest",
+};
+
+const SIDEBAR_PANEL_COLLAPSED_KEY = "motion-studio-sidebar-panel-collapsed";
+
 type TokenListPanelProps = {
   activeSection: StudioSection;
   onSectionChange: (section: StudioSection) => void;
@@ -82,6 +95,21 @@ export function TokenListPanel({
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [listGroupMode, setListGroupMode] = useState<"category" | "component">("component");
   const inlineInputRef = useRef<HTMLInputElement>(null);
+  const [panelCollapsed, setPanelCollapsedState] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem(SIDEBAR_PANEL_COLLAPSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  function setPanelCollapsed(next: boolean) {
+    setPanelCollapsedState(next);
+    try {
+      window.localStorage.setItem(SIDEBAR_PANEL_COLLAPSED_KEY, next ? "1" : "0");
+    } catch {}
+  }
 
   const filtered = useMemo(() => {
     return tokens.filter((t) => tokenMatchesSearch(t, searchQuery));
@@ -216,10 +244,573 @@ export function TokenListPanel({
     }
   }
 
+  const activeRoute = SIDEBAR_ROUTES.find((r) => r.key === activeSection);
+
+  function buildTokenListBody(compact: boolean) {
+    const bar = cn(
+      "shrink-0 space-y-2 border-b border-border/60",
+      compact ? "px-2 pb-2 pt-2" : "space-y-3 px-3 pb-3 pt-3",
+    );
+    const navPad = compact ? "px-2 py-2" : "px-3 py-3";
+    const row = compact ? "gap-1 rounded-md px-1.5 py-1.5" : "gap-1.5 rounded-md px-2 py-2";
+    const titleCls = compact ? "text-[11px]" : "text-[12px]";
+    const monoCls = compact ? "text-[9px]" : "text-[10px]";
+    const searchCls = compact
+      ? "h-8 rounded-md border-border bg-background py-1.5 pl-7 pr-2 text-[11px] shadow-sm"
+      : "h-9 rounded-md border-border bg-background py-2 pl-8 pr-2.5 text-xs shadow-sm";
+    const searchIconCls = compact
+      ? "pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground"
+      : "pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground";
+    const seg = compact ? "flex h-7 w-full rounded-md border border-border/80 bg-muted/40 p-0.5" : "flex h-8 w-full rounded-lg border border-border/80 bg-muted/40 p-0.5";
+    const segBtn = compact ? "flex-1 rounded-[5px] text-[9px] font-semibold transition-colors" : "flex-1 rounded-[6px] text-[10px] font-semibold transition-colors";
+    const groupStack = compact ? "space-y-3.5" : "space-y-5";
+    const dot = compact ? "h-1.5 w-1.5 shrink-0 rounded-full" : "h-2 w-2 shrink-0 rounded-full";
+    const menuBtn = compact ? "h-6 w-6 shrink-0 rounded-md text-muted-foreground hover:bg-muted" : "h-7 w-7 shrink-0 rounded-md text-muted-foreground hover:bg-muted";
+    const menuIcon = compact ? "h-3 w-3" : "h-3.5 w-3.5";
+
+    return (
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className={bar}>
+          <div className="relative">
+            <Search className={searchIconCls} />
+            <Input
+              value={searchQuery}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search tokens…"
+              className={searchCls}
+            />
+          </div>
+          <div className={seg}>
+            <button
+              type="button"
+              className={cn(
+                segBtn,
+                listGroupMode === "component"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setListGroupMode("component")}
+            >
+              By component
+            </button>
+            <button
+              type="button"
+              className={cn(
+                segBtn,
+                listGroupMode === "category"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setListGroupMode("category")}
+            >
+              By category
+            </button>
+          </div>
+        </div>
+        <nav className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden", navPad)}>
+          <div className={groupStack}>
+            {grouped.map((group) => (
+              <div key={`${group.kind}-${group.id}`}>
+                <p
+                  className={cn(
+                    "px-0.5 font-semibold uppercase tracking-wider text-muted-foreground",
+                    compact ? "mb-1.5 text-[9px]" : "mb-2 text-[10px]",
+                  )}
+                >
+                  {group.title}
+                </p>
+                {group.items.map((token) => {
+                  const selected = token.id === selectedId;
+                  const isHovered = hoveredId === token.id;
+                  const isEditing = editingTokenId === token.id;
+                  const showMenu = canEditTokens && (selected || isHovered);
+                  const showDeleteConfirm = deleteConfirmId === token.id;
+                  const config = categoryConfig[token.category];
+
+                  return (
+                    <div
+                      key={token.id}
+                      onMouseEnter={() => setHoveredId(token.id)}
+                      onMouseLeave={() => setHoveredId((current) => (current === token.id ? null : current))}
+                    >
+                      <div
+                        className={cn(
+                          "flex items-center",
+                          row,
+                          selected ? "bg-accent shadow-sm" : "hover:bg-muted/80",
+                        )}
+                      >
+                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                          <div
+                            className={dot}
+                            style={{ backgroundColor: selected ? "#4c3dc9" : config.color }}
+                          />
+
+                          {isEditing ? (
+                            <Input
+                              ref={inlineInputRef}
+                              value={inlineName}
+                              onChange={(event) => setInlineName(event.target.value)}
+                              onBlur={() => {
+                                void submitRename();
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  void submitRename();
+                                }
+                                if (event.key === "Escape") {
+                                  event.preventDefault();
+                                  cancelRename();
+                                }
+                              }}
+                              className={cn(
+                                "flex-1 rounded-md border border-border bg-background px-2 py-1 font-mono text-xs",
+                                compact ? "h-7" : "h-8 py-1.5",
+                              )}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              className={cn("flex min-w-0 flex-1 flex-col text-left", compact ? "gap-0.5" : "gap-1")}
+                              onClick={() => selectToken(token.id)}
+                            >
+                              <div className="flex min-w-0 items-center gap-1">
+                                <span
+                                  className={cn(
+                                    "min-w-0 flex-1 truncate font-semibold leading-snug",
+                                    titleCls,
+                                    selected ? "text-primary" : "text-foreground",
+                                  )}
+                                >
+                                  {humanizeTokenDescriptor(tokenDescriptorFromName(token.name))}
+                                </span>
+                                {(() => {
+                                  const rel = recentUpdateLabel(token.updatedAt);
+                                  return rel ? (
+                                    <Badge
+                                      variant="secondary"
+                                      className={cn(
+                                        "shrink-0 border-0 bg-accent font-semibold uppercase tracking-wide text-accent-foreground",
+                                        compact
+                                          ? "h-3.5 px-1 py-0 text-[8px]"
+                                          : "h-4 px-1.5 py-0 text-[9px]",
+                                      )}
+                                      title={
+                                        token.updatedAt ? new Date(token.updatedAt).toLocaleString() : undefined
+                                      }
+                                    >
+                                      {rel}
+                                    </Badge>
+                                  ) : null;
+                                })()}
+                              </div>
+                              <span
+                                className={cn(
+                                  "truncate font-mono leading-snug text-muted-foreground",
+                                  monoCls,
+                                  selected ? "text-primary/80" : "",
+                                )}
+                              >
+                                {token.name || "untitled"}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+
+                        {canEditTokens ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(event) => event.stopPropagation()}
+                                  className={cn(
+                                    menuBtn,
+                                    showMenu ? "opacity-100" : "opacity-0",
+                                  )}
+                                >
+                                  <MoreHorizontal className={menuIcon} />
+                                </Button>
+                              }
+                            />
+                            <DropdownMenuContent align="end" sideOffset={6} className="w-40">
+                              <DropdownMenuItem onClick={() => void duplicateTokenAction(token.id)} className="text-xs">
+                                <Copy className="h-3.5 w-3.5" />
+                                Duplicate
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => startRename(token.id, token.name)} className="text-xs">
+                                <Pencil className="h-3.5 w-3.5" />
+                                Rename
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => requestDelete(token.id)}
+                                variant="destructive"
+                                className="text-xs"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
+                      </div>
+
+                      {showDeleteConfirm ? (
+                        <div
+                          className={cn(
+                            "border border-border bg-card text-xs shadow-sm",
+                            compact ? "mt-1.5 rounded-md p-2" : "mt-2 rounded-lg p-3",
+                          )}
+                        >
+                          <p className="text-foreground">Delete {token.name || "untitled"}? This cannot be undone.</p>
+                          <div className={cn("flex justify-end", compact ? "mt-2 gap-1.5" : "mt-3 gap-2")}>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => setDeleteConfirmId(null)}
+                              className={cn(
+                                "h-auto px-2 py-1",
+                                compact ? "text-[10px]" : "text-[11px]",
+                              )}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => confirmDelete(token.id)}
+                              className={cn(
+                                "h-auto px-2 py-1 text-red-600 hover:bg-red-50 hover:text-red-700",
+                                compact ? "text-[10px]" : "text-[11px]",
+                              )}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </nav>
+      </div>
+    );
+  }
+
+  const tokenListBody = buildTokenListBody(false);
+
+  const libraryBody = (
+    <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 transition-all duration-300">
+      <div>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Categories</p>
+        <div className="space-y-2">
+          {categoryStats.map(({ category, count }) => (
+            <div
+              key={category}
+              className="flex items-center justify-between rounded-lg px-2.5 py-2 text-[11px] text-foreground"
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ backgroundColor: categoryConfig[category].color }}
+                />
+                <span>{category}</span>
+              </div>
+              <span className="text-[10px] text-muted-foreground">{count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </nav>
+  );
+
+  const footerCompact = (
+    <footer className="shrink-0 space-y-1.5 border-t border-border/80 bg-muted/10 px-2 py-2">
+      {canEditTokens ? (
+        <Button
+          type="button"
+          onClick={() => {
+            void deployChanges();
+          }}
+          disabled={!workspaceId || deploying || unsyncedCount === 0}
+          className="h-7 w-full justify-center rounded-md bg-primary text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          {deploying ? "Deploying..." : "Deploy"}
+        </Button>
+      ) : null}
+      {canEditTokens ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            void createTokenAction();
+          }}
+          className="h-7 w-full justify-center rounded-md text-[11px] font-medium"
+        >
+          New token
+        </Button>
+      ) : null}
+      <p className="px-0.5 text-center text-[9px] leading-relaxed text-muted-foreground">
+        {activeTokenCount} active
+        {unsyncedCount > 0 ? ` · ${unsyncedCount} unsynced` : " · synced"}
+      </p>
+    </footer>
+  );
+
+  const footerClassic = (
+    <div className="shrink-0 space-y-3 border-t border-border p-4">
+      {canEditTokens ? (
+        <Button
+          type="button"
+          onClick={() => {
+            void deployChanges();
+          }}
+          disabled={!workspaceId || deploying || unsyncedCount === 0}
+          className="h-8 w-full justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          {deploying ? "Deploying..." : "Deploy Changes"}
+        </Button>
+      ) : null}
+      {canEditTokens ? (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            void createTokenAction();
+          }}
+          className="h-8 w-full justify-center rounded-md border border-dashed border-border bg-transparent text-xs font-medium text-foreground hover:bg-muted"
+        >
+          New Token
+        </Button>
+      ) : null}
+      <div className="px-1 text-[10px] text-muted-foreground">
+        {activeTokenCount} active tokens
+        {unsyncedCount > 0 ? ` • ${unsyncedCount} pending sync` : " • live sync"}
+      </div>
+      <div className="mt-3 border-t border-border pt-3 text-[10px] uppercase tracking-widest text-muted-foreground">
+        <div className="flex items-center gap-1.5 px-1 py-1">
+          <LifeBuoy className="h-3 w-3" />
+          Support
+        </div>
+        <div className="flex items-center gap-1.5 px-1 py-1">
+          <FileText className="h-3 w-3" />
+          Docs
+        </div>
+      </div>
+    </div>
+  );
+
+  if (activeSection === "physics-lab") {
+    return (
+      <div className="flex h-full min-h-0 shrink-0 border-r border-border bg-background">
+        <nav
+          className="flex w-10 shrink-0 flex-col items-center gap-0.5 border-r border-border/80 bg-muted/25 py-2"
+          aria-label="Studio sections"
+        >
+          <Avatar className="size-8 rounded-md border border-border/60 shadow-sm">
+            <AvatarFallback className="rounded-md text-[10px] font-bold">M</AvatarFallback>
+          </Avatar>
+          <div className="my-1.5 h-px w-6 bg-border/80" />
+          {panelCollapsed ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              title="Expand token panel"
+              aria-expanded={!panelCollapsed}
+              onClick={() => setPanelCollapsed(false)}
+              className="size-8 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : null}
+          {SIDEBAR_ROUTES.map((item) => {
+            const active = item.key === activeSection;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                title={item.label}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
+                onClick={() => onSectionChange(item.key)}
+                className={cn(
+                  "flex size-8 items-center justify-center rounded-md transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+              </button>
+            );
+          })}
+          <div className="flex-1" />
+          <a
+            href="/contact"
+            title="Support"
+            className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <LifeBuoy className="h-3.5 w-3.5" />
+          </a>
+          <a
+            href="/releases"
+            title="Docs & releases"
+            className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <FileText className="h-3.5 w-3.5" />
+          </a>
+        </nav>
+
+        {panelCollapsed ? null : (
+          <aside className="flex h-full min-h-0 w-[15rem] min-w-[14rem] max-w-[16rem] shrink-0 flex-col border-border bg-muted/20 sm:w-60 sm:min-w-0 sm:max-w-none">
+            <header className="flex shrink-0 flex-row items-start justify-between gap-2 border-b border-border/80 px-2.5 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold leading-tight text-foreground">
+                  {workspaceName?.trim() || "Workspace"}
+                </p>
+                <p className="mt-0.5 text-[10px] font-medium text-primary">{activeRoute?.label}</p>
+                <p className="mt-0.5 line-clamp-2 text-[9px] leading-snug text-muted-foreground">
+                  {SECTION_HINT[activeSection]}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title="Shrink token panel"
+                aria-expanded={!panelCollapsed}
+                onClick={() => setPanelCollapsed(true)}
+                className="h-7 w-7 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </header>
+            {buildTokenListBody(true)}
+            {footerCompact}
+          </aside>
+        )}
+      </div>
+    );
+  }
+
+  if (panelCollapsed) {
+    return (
+      <aside className="flex h-full min-h-0 w-10 min-w-10 shrink-0 flex-col border-r border-border bg-background">
+        <nav
+          className="flex min-h-0 flex-1 flex-col items-center gap-0.5 bg-muted/25 py-2"
+          aria-label="Studio sections"
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            title="Expand sidebar"
+            aria-expanded={!panelCollapsed}
+            onClick={() => setPanelCollapsed(false)}
+            className="size-8 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Avatar className="size-8 rounded-md border border-border/60 shadow-sm">
+            <AvatarFallback className="rounded-md text-[10px] font-bold">M</AvatarFallback>
+          </Avatar>
+          <div className="my-1.5 h-px w-6 bg-border/80" />
+          {SIDEBAR_ROUTES.map((item) => {
+            const active = item.key === activeSection;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                title={item.label}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
+                onClick={() => onSectionChange(item.key)}
+                className={cn(
+                  "flex size-8 items-center justify-center rounded-md transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+              </button>
+            );
+          })}
+          <div className="flex-1" />
+          {canEditTokens ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              title="Deploy"
+              onClick={() => {
+                void deployChanges();
+              }}
+              disabled={!workspaceId || deploying || unsyncedCount === 0}
+              className="size-8 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
+          {canEditTokens ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              title="New token"
+              onClick={() => {
+                void createTokenAction();
+              }}
+              className="size-8 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
+          <a
+            href="/contact"
+            title="Support"
+            className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <LifeBuoy className="h-3.5 w-3.5" />
+          </a>
+          <a
+            href="/releases"
+            title="Docs & releases"
+            className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <FileText className="h-3.5 w-3.5" />
+          </a>
+        </nav>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="flex w-[288px] min-w-[272px] shrink-0 flex-col border-r border-border bg-muted/30">
+    <aside className="flex h-full min-h-0 w-[288px] min-w-[272px] shrink-0 flex-col border-r border-border bg-muted/30">
       <div className="shrink-0 space-y-4 border-b border-border px-4 pb-5 pt-5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspace</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Workspace</p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            title="Shrink sidebar"
+            aria-expanded={!panelCollapsed}
+            onClick={() => setPanelCollapsed(true)}
+            className="h-8 w-8 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
         <div className="flex items-center gap-3">
           <Avatar className="size-8 rounded-md">
             <AvatarFallback className="rounded-md text-sm font-bold">M</AvatarFallback>
@@ -256,272 +847,9 @@ export function TokenListPanel({
         </div>
       </div>
 
-      {activeSection === "library" ? (
-        <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 transition-all duration-300">
-          <div>
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Categories</p>
-            <div className="space-y-2">
-              {categoryStats.map(({ category, count }) => (
-                <div
-                  key={category}
-                  className="flex items-center justify-between rounded-lg px-2.5 py-2 text-[11px] text-foreground"
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: categoryConfig[category].color }}
-                    />
-                    <span>{category}</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">{count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </nav>
-      ) : (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="shrink-0 space-y-4 border-b border-border/70 px-4 pb-4 pt-5">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Name, component, tags…"
-                className="h-10 rounded-lg border-border bg-background py-2 pl-10 pr-3 text-xs shadow-sm"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant={listGroupMode === "component" ? "default" : "secondary"}
-                className="h-8 rounded-md px-3 text-[10px] font-semibold uppercase tracking-wide"
-                onClick={() => setListGroupMode("component")}
-              >
-                By component
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={listGroupMode === "category" ? "default" : "secondary"}
-                className="h-8 rounded-md px-3 text-[10px] font-semibold uppercase tracking-wide"
-                onClick={() => setListGroupMode("category")}
-              >
-                By category
-              </Button>
-            </div>
-          </div>
-          <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
-            <div className="space-y-6">
-              {grouped.map((group) => (
-                <div key={`${group.kind}-${group.id}`}>
-                  <p className="mb-2.5 px-0.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                    {group.title}
-                  </p>
-                  {group.items.map((token) => {
-                    const selected = token.id === selectedId;
-                    const isHovered = hoveredId === token.id;
-                    const isEditing = editingTokenId === token.id;
-                    const showMenu = canEditTokens && (selected || isHovered);
-                    const showDeleteConfirm = deleteConfirmId === token.id;
-                    const config = categoryConfig[token.category];
+      {activeSection === "library" ? libraryBody : tokenListBody}
 
-                    return (
-                      <div
-                        key={token.id}
-                        onMouseEnter={() => setHoveredId(token.id)}
-                        onMouseLeave={() =>
-                          setHoveredId((current) => (current === token.id ? null : current))
-                        }
-                      >
-                        <div
-                          className={cn(
-                            "flex items-center gap-2 rounded-lg px-2.5 py-2.5",
-                            selected ? "bg-accent" : "hover:bg-muted",
-                          )}
-                        >
-                          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                            <div
-                              className="h-2 w-2 shrink-0 rounded-full"
-                              style={{ backgroundColor: selected ? "#4c3dc9" : config.color }}
-                            />
-
-                            {isEditing ? (
-                              <Input
-                                ref={inlineInputRef}
-                                value={inlineName}
-                                onChange={(event) => setInlineName(event.target.value)}
-                                onBlur={() => {
-                                  void submitRename();
-                                }}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    void submitRename();
-                                  }
-                                  if (event.key === "Escape") {
-                                    event.preventDefault();
-                                    cancelRename();
-                                  }
-                                }}
-                                className="h-8 flex-1 rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs"
-                              />
-                            ) : (
-                              <button
-                                type="button"
-                                className="flex min-w-0 flex-1 flex-col gap-1 text-left"
-                                onClick={() => selectToken(token.id)}
-                              >
-                                <div className="flex min-w-0 items-center gap-1.5">
-                                  <span
-                                    className={cn(
-                                      "min-w-0 flex-1 truncate text-[12px] font-semibold leading-snug",
-                                      selected ? "text-primary" : "text-foreground",
-                                    )}
-                                  >
-                                    {humanizeTokenDescriptor(tokenDescriptorFromName(token.name))}
-                                  </span>
-                                  {(() => {
-                                    const rel = recentUpdateLabel(token.updatedAt);
-                                    return rel ? (
-                                      <Badge
-                                        variant="secondary"
-                                        className="h-4 shrink-0 border-0 bg-accent px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-accent-foreground"
-                                        title={
-                                          token.updatedAt ? new Date(token.updatedAt).toLocaleString() : undefined
-                                        }
-                                      >
-                                        {rel}
-                                      </Badge>
-                                    ) : null;
-                                  })()}
-                                </div>
-                                <span
-                                  className={cn(
-                                    "truncate font-mono text-[10px] leading-snug text-muted-foreground",
-                                    selected ? "text-primary/80" : "",
-                                  )}
-                                >
-                                  {token.name || "untitled"}
-                                </span>
-                              </button>
-                            )}
-                          </div>
-
-                          {canEditTokens ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger
-                                render={
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(event) => event.stopPropagation()}
-                                    className={cn(
-                                      "h-7 w-7 shrink-0 rounded-md text-muted-foreground hover:bg-muted",
-                                      showMenu ? "opacity-100" : "opacity-0",
-                                    )}
-                                  >
-                                    <MoreHorizontal className="h-3.5 w-3.5" />
-                                  </Button>
-                                }
-                              />
-                              <DropdownMenuContent align="end" sideOffset={6} className="w-40">
-                                <DropdownMenuItem onClick={() => void duplicateTokenAction(token.id)} className="text-xs">
-                                  <Copy className="h-3.5 w-3.5" />
-                                  Duplicate
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => startRename(token.id, token.name)} className="text-xs">
-                                  <Pencil className="h-3.5 w-3.5" />
-                                  Rename
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => requestDelete(token.id)}
-                                  variant="destructive"
-                                  className="text-xs"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : null}
-                        </div>
-
-                        {showDeleteConfirm ? (
-                          <div className="mt-2 rounded-lg border border-border bg-card p-3 text-xs shadow-sm">
-                            <p className="text-foreground">Delete {token.name || "untitled"}? This cannot be undone.</p>
-                            <div className="mt-3 flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => setDeleteConfirmId(null)}
-                                className="h-auto px-2 py-1 text-[11px]"
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => confirmDelete(token.id)}
-                                className="h-auto px-2 py-1 text-[11px] text-red-600 hover:bg-red-50 hover:text-red-700"
-                              >
-                                Delete
-                              </Button>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </nav>
-        </div>
-      )}
-
-      <div className="shrink-0 space-y-3 border-t border-border p-4">
-        {canEditTokens ? (
-          <Button
-            type="button"
-            onClick={() => {
-              void deployChanges();
-            }}
-            disabled={!workspaceId || deploying || unsyncedCount === 0}
-            className="h-8 w-full justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground hover:bg-primary/90"
-          >
-            {deploying ? "Deploying..." : "Deploy Changes"}
-          </Button>
-        ) : null}
-        {canEditTokens ? (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              void createTokenAction();
-            }}
-            className="h-8 w-full justify-center rounded-md border border-dashed border-border bg-transparent text-xs font-medium text-foreground hover:bg-muted"
-          >
-            New Token
-          </Button>
-        ) : null}
-        <div className="px-1 text-[10px] text-muted-foreground">
-          {activeTokenCount} active tokens
-          {unsyncedCount > 0 ? ` • ${unsyncedCount} pending sync` : " • live sync"}
-        </div>
-        <div className="mt-3 border-t border-border pt-3 text-[10px] uppercase tracking-widest text-muted-foreground">
-          <div className="flex items-center gap-1.5 px-1 py-1">
-            <LifeBuoy className="h-3 w-3" />
-            Support
-          </div>
-          <div className="flex items-center gap-1.5 px-1 py-1">
-            <FileText className="h-3 w-3" />
-            Docs
-          </div>
-        </div>
-      </div>
+      {footerClassic}
     </aside>
   );
 }
