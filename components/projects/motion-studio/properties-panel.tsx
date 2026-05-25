@@ -21,6 +21,7 @@ import { useSelectedToken, useTokenStore } from "@/lib/token-store";
 import {
   deleteTokenAction,
   duplicateTokenAction,
+  revertTokenToPublishedMotionAction,
   saveTokenNameAction,
 } from "@/lib/token-actions";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,10 @@ import {
   FRONTEND_ANIMATION_PRESETS,
   normalizeEasing,
   normalizeTokenNameInput,
+  toFramerEasing,
 } from "./shared";
+import { CubicBezierEasingControl } from "./cubic-bezier-easing-control";
+import { isValidTokenEasingString } from "@/lib/token-easing";
 import { Slider, SwitchPill, ToggleRow } from "./ui-controls";
 
 type PropertiesPanelProps = {
@@ -63,7 +67,12 @@ export function PropertiesPanel({
   const [customOpen, setCustomOpen] = useState(false);
   const [customPrompt, setCustomPrompt] = useState("");
   const [customApplying, setCustomApplying] = useState(false);
+  const [intentDraft, setIntentDraft] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (token) setIntentDraft(token.intent ?? "");
+  }, [token?.id, token?.intent]);
 
   useEffect(() => {
     if (token) setNameDraft(token.name);
@@ -215,6 +224,24 @@ export function PropertiesPanel({
         <p className="mt-1 text-[10px] text-muted-foreground">Format: category.descriptor (e.g. enter.default)</p>
       </div>
 
+      <div className="mb-5">
+        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          Intent
+        </label>
+        <Textarea
+          value={intentDraft}
+          onChange={(event) => setIntentDraft(event.target.value)}
+          onBlur={() => {
+            const next = intentDraft.trim();
+            if (next !== (token.intent ?? "").trim()) update({ intent: next });
+          }}
+          disabled={!canEditTokens}
+          rows={3}
+          placeholder="Why this token exists — for your team and reviewers."
+          className="resize-none bg-background text-xs"
+        />
+      </div>
+
       <div className="mb-6 rounded-xl border border-border bg-card p-4">
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Animation Presets</p>
         <p className="mb-3 text-[11px] text-muted-foreground">6 trending presets used in modern product interfaces.</p>
@@ -345,14 +372,58 @@ export function PropertiesPanel({
             </Button>
           ))}
         </div>
-        <Input
-          value={token.easing.startsWith("cubic-bezier") ? token.easing : ""}
-          onChange={(event) => update({ isSpring: false, easing: event.target.value })}
-          placeholder="cubic-bezier(0.42, 0, 0.58, 1)"
-          disabled={!canEditTokens}
-          className="mt-2 h-8 rounded-md border-border bg-background px-2 font-mono text-[10px]"
-        />
+        {!token.isSpring ? (
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-2 h-7 w-full text-[10px]"
+              disabled={!canEditTokens}
+              onClick={() => {
+                const [a, b, c, d] = toFramerEasing(token.easing);
+                update({ isSpring: false, easing: `cubic-bezier(${a}, ${b}, ${c}, ${d})` });
+              }}
+            >
+              Edit as cubic-bezier curve
+            </Button>
+            {token.easing.trim().toLowerCase().startsWith("cubic-bezier") ? (
+              <div className="mt-2">
+                <CubicBezierEasingControl
+                  easing={token.easing}
+                  disabled={!canEditTokens}
+                  onChange={(easing) => update({ isSpring: false, easing })}
+                />
+              </div>
+            ) : null}
+            <Input
+              value={token.easing}
+              onChange={(event) => update({ isSpring: false, easing: event.target.value })}
+              placeholder="easing or cubic-bezier(...)"
+              disabled={!canEditTokens}
+              className={cn(
+                "mt-2 h-8 rounded-md bg-background px-2 font-mono text-[10px]",
+                !token.isSpring && !isValidTokenEasingString(token.easing)
+                  ? "border border-red-500"
+                  : "border border-border",
+              )}
+            />
+          </>
+        ) : null}
       </div>
+
+      {token.publishedVersion ? (
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-8 w-full text-xs"
+            disabled={!canEditTokens}
+            onClick={() => void revertTokenToPublishedMotionAction(token.id)}
+          >
+            Revert motion to latest release
+          </Button>
+        </div>
+      ) : null}
 
       <div className="mt-5 space-y-3">
         <ToggleRow label="Additive Motion" enabled={additiveMotion} onToggle={setAdditiveMotion} />

@@ -48,6 +48,7 @@ import {
   softDeleteTokenAction,
 } from "@/lib/token-actions";
 import { flushWorkspaceTokenPatches } from "@/lib/workspace-token-sync";
+import { DEFAULT_WORKSPACE_TOKEN_NAMES } from "@/lib/workspace-presets";
 
 import { normalizeTokenNameInput, type StudioSection } from "./shared";
 
@@ -87,6 +88,12 @@ export function TokenListPanel({
     selectToken,
     hasPublishedUsage,
     workspaceId,
+    bulkTokenIds,
+    toggleBulkTokenId,
+    clearBulkTokenSelection,
+    runBulkDeprecate,
+    runBulkSnapDuration,
+    runBulkBumpCategory,
   } = useTokenStore();
   const canEditTokens = workspaceRole === "owner" || workspaceRole === "editor";
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -267,6 +274,10 @@ export function TokenListPanel({
     const dot = compact ? "h-1.5 w-1.5 shrink-0 rounded-full" : "h-2 w-2 shrink-0 rounded-full";
     const menuBtn = compact ? "h-6 w-6 shrink-0 rounded-md text-muted-foreground hover:bg-muted" : "h-7 w-7 shrink-0 rounded-md text-muted-foreground hover:bg-muted";
     const menuIcon = compact ? "h-3 w-3" : "h-3.5 w-3.5";
+    const seedNames = DEFAULT_WORKSPACE_TOKEN_NAMES as readonly string[];
+    const activeNotDeprecated = tokens.filter((t) => !t.deprecated);
+    const hasCustomToken = activeNotDeprecated.some((t) => !seedNames.includes(t.name));
+    const starterToken = activeNotDeprecated.find((t) => seedNames.includes(t.name));
 
     return (
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -306,10 +317,85 @@ export function TokenListPanel({
               By category
             </button>
           </div>
+          {bulkTokenIds.length > 0 && canEditTokens ? (
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2">
+              <span className="text-[10px] font-medium text-muted-foreground">{bulkTokenIds.length} selected</span>
+              <Button type="button" size="sm" variant="secondary" className="h-7 text-[10px]" onClick={() => runBulkDeprecate()}>
+                Deprecate
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-7 text-[10px]"
+                onClick={() => runBulkSnapDuration(50)}
+              >
+                Snap 50ms
+              </Button>
+              <Button type="button" size="sm" variant="secondary" className="h-7 text-[10px]" onClick={() => runBulkBumpCategory()}>
+                Bump category
+              </Button>
+              <Button type="button" size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => clearBulkTokenSelection()}>
+                Clear
+              </Button>
+            </div>
+          ) : null}
         </div>
         <nav className={cn("min-h-0 flex-1 overflow-y-auto overflow-x-hidden", navPad)}>
           <div className={groupStack}>
-            {grouped.map((group) => (
+            {!hasCustomToken && canEditTokens && starterToken && filtered.length > 0 ? (
+              <div
+                className={cn(
+                  "rounded-lg border border-border bg-card",
+                  compact ? "mx-0 px-2 py-2" : "mx-0.5 px-3 py-3",
+                )}
+              >
+                <p className={cn("text-muted-foreground", compact ? "mb-1.5 text-[9px]" : "mb-2 text-[10px]")}>
+                  Only seed tokens so far — branch one to customize.
+                </p>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => void duplicateTokenAction(starterToken.id)}
+                >
+                  Duplicate starter token
+                </Button>
+              </div>
+            ) : null}
+            {grouped.length === 0 ? (
+              <div
+                className={cn(
+                  "flex flex-col items-center justify-center px-3 text-center",
+                  compact ? "py-8" : "py-12",
+                )}
+              >
+                <p className={cn("font-medium text-foreground", compact ? "text-xs" : "text-sm")}>
+                  {activeNotDeprecated.length === 0
+                    ? "No tokens yet"
+                    : searchQuery.trim()
+                      ? "No matches for this search"
+                      : "Nothing to show"}
+                </p>
+                <div className="mt-4 w-full max-w-[220px]">
+                  {activeNotDeprecated.length === 0 && canEditTokens ? (
+                    <Button type="button" className="w-full" size="sm" onClick={() => void createTokenAction()}>
+                      New token
+                    </Button>
+                  ) : filtered.length === 0 && searchQuery.trim() !== "" ? (
+                    <Button type="button" className="w-full" size="sm" onClick={() => setSearch("")}>
+                      Clear search
+                    </Button>
+                  ) : activeNotDeprecated.length > 0 && activeSection !== "physics-lab" ? (
+                    <Button type="button" className="w-full" size="sm" onClick={() => onSectionChange("physics-lab")}>
+                      Open motion studio
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              grouped.map((group) => (
               <div key={`${group.kind}-${group.id}`}>
                 <p
                   className={cn(
@@ -341,6 +427,16 @@ export function TokenListPanel({
                         )}
                       >
                         <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                          {canEditTokens ? (
+                            <input
+                              type="checkbox"
+                              checked={bulkTokenIds.includes(token.id)}
+                              onChange={() => toggleBulkTokenId(token.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="h-3.5 w-3.5 shrink-0 rounded border border-border accent-primary"
+                              aria-label="Select for bulk edit"
+                            />
+                          ) : null}
                           <div
                             className={dot}
                             style={{ backgroundColor: selected ? "#4c3dc9" : config.color }}
@@ -496,7 +592,7 @@ export function TokenListPanel({
                   );
                 })}
               </div>
-            ))}
+            )))}
           </div>
         </nav>
       </div>

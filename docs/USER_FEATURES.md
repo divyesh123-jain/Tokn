@@ -57,7 +57,12 @@ For UX-oriented ideas on top of this, see [USER_EXPERIENCE_OPPORTUNITIES.md](./U
 
 Route: **`/projects/[projectId]`** where `projectId` is the workspace id.
 
-- **Token authoring** — Edit motion tokens (timing vs spring, easing, offsets, opacity/scale starts, deprecation). Changes sync to the server with pending-state feedback.
+- **Token authoring** — Edit motion tokens (timing vs spring, easing, offsets, opacity/scale starts, deprecation). Optional **intent** text per token. Changes sync to the server with pending-state feedback.
+- **Session undo/redo** — In Motion Lab, undo/redo recent token edits before they’re fully flushed to the API.
+- **Bulk edit** — In the studio token list, multi-select via checkboxes; deprecate all, snap durations to 50ms, or rotate category on the selection.
+- **Easing** — Named presets plus cubic-bezier string with live validation and a small curve editor (timing mode).
+- **Compare** — In Motion Lab preview, compare draft vs **latest published** snapshot for the token, or vs **another token** in the workspace.
+- **Revert to published motion** — Inspector action (when the token has a `publishedVersion`) restores motion fields from the latest release snapshot (name unchanged).
 - **Live preview** — Preview selected tokens on canonical UI targets (e.g. button, card, modal, toast, list) with replay.
 - **Publish** — Owners can publish a semantic version; publishes snapshot data for releases and public preview. On success, a **pinned public preview URL** for that version can be copied to the clipboard.
 - **SDK export** — After at least one publish, export the workspace token set as **TypeScript** or **JSON** (copy or download). Requires a published version.
@@ -66,8 +71,8 @@ Route: **`/projects/[projectId]`** where `projectId` is the workspace id.
 
 ## Token library (`/tokens`)
 
-- **Browse** — Grid of tokens with category filters, search, and lightweight motion affordances on cards.
-- **Detail / edit** — Select a token to inspect and adjust fields (names with validation, delete where allowed).
+- **Browse** — Grid of tokens with category filters, search, intent snippets on cards where set, and lightweight motion affordances on cards.
+- **Detail / edit** — Select a token to inspect and adjust fields (names with validation, intent, delete where allowed).
 - **Copy** — Per-token Framer Motion–style export snippets; optional full **SDK copy** when the workspace has a published version.
 - **Share library** — Copies a public preview URL for async review.
 

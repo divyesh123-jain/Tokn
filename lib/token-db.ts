@@ -23,6 +23,7 @@ export type MotionTokenDbRow = {
   publishedVersion?: string | null;
   updatedBy?: string | null;
   deprecated: boolean;
+  intent?: string | null;
 };
 
 function toUpdatedAtIso(v: Date | string | null | undefined): string | undefined {
@@ -55,6 +56,7 @@ export function motionTokenDbRowToItem(
     updatedBy: row.updatedBy ?? null,
     publishedAt: toUpdatedAtIso(row.publishedAt),
     publishedVersion: row.publishedVersion ?? undefined,
+    intent: typeof row.intent === "string" ? row.intent : "",
   };
 }
 
@@ -63,7 +65,22 @@ export function motionTokenItemToDbFields(
     MotionTokenItem,
     "id" | "pendingSync" | "updatedAt" | "publishedAt" | "publishedVersion"
   >,
-): Omit<MotionTokenDbRow, "id" | "workspaceId" | "publishedAt" | "publishedVersion"> {
+): {
+  name: string;
+  category: string;
+  durationMs: number;
+  delayMs: number;
+  easing: string;
+  yOffset: number;
+  scaleStart: number;
+  opacityStart: number;
+  isSpring: boolean;
+  springStiffness: number;
+  springDamping: number;
+  springMass: number;
+  deprecated: boolean;
+  intent: string;
+} {
   return {
     name: item.name,
     category: item.category,
@@ -78,6 +95,7 @@ export function motionTokenItemToDbFields(
     springDamping: item.springDamping,
     springMass: Math.round(item.springMass * SPRING_MASS_FACTOR),
     deprecated: item.deprecated,
+    intent: item.intent ?? "",
   };
 }
 

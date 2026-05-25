@@ -20,12 +20,12 @@ Ideas to improve how it feels to use Tokn day to day. Complements [USER_FEATURES
 
 ## Motion studio and authoring
 
-- **Undo / redo and history** — Local session history for token edits; optional “revert to last published” per token.
-- **Bulk operations** — Multi-select tokens to deprecate, bump category, or align duration to a grid (e.g. 50ms steps).
-- **Easing UX** — Visual cubic-bezier editor with presets; validate CSS easing strings live.
-- **Side-by-side A/B** — Compare draft vs last published (or two tokens) on the same preview component.
-- **Intent field surfaced in UI** — Short “why this token exists” text per token (you already model intent in product thesis); show in library cards and public preview.
-- **Keyboard workflow** — Arrow through token list, `E` to edit name, `P` preview replay — reduces mouse travel.
+- **Undo / redo and history** — *(Done: session undo/redo + revert motion from latest release snapshot.)*
+- **Bulk operations** — *(Done: multi-select in list — deprecate, 50ms duration snap, category bump.)*
+- **Easing UX** — *(Done: presets + cubic-bezier curve control + live CSS validation.)*
+- **Side-by-side A/B** — *(Done: Motion Lab compare — latest publish or another token.)*
+- **Intent field** — *(Done: DB + studio + `/tokens` + public preview.)*
+- **Keyboard workflow** — Deferred.
 
 ## Preview and validation
 

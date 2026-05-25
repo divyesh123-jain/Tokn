@@ -20,6 +20,7 @@ function tokenToApiBody(t: MotionTokenItem) {
     springDamping: t.springDamping,
     springMass: t.springMass,
     deprecated: t.deprecated,
+    intent: t.intent ?? "",
   };
 }
 

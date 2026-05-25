@@ -4,7 +4,7 @@ import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 import { getSessionUserState } from "@/lib/auth-helpers";
 
 type OnboardingPageProps = {
-  searchParams?: Promise<{ step?: string }>;
+  searchParams?: Promise<{ step?: string; preset?: string }>;
 };
 
 function defaultWorkspaceNameFromProfile(fullName: string | null | undefined) {
@@ -15,10 +15,10 @@ function defaultWorkspaceNameFromProfile(fullName: string | null | undefined) {
   return `${firstName} Workspace`;
 }
 
-function normalizeStep(step: string | undefined): 1 | 2 | 3 | 4 {
+function normalizeStep(step: string | undefined): 1 | 2 | 3 {
   const numeric = Number(step ?? "1");
-  if (numeric >= 1 && numeric <= 4) {
-    return numeric as 1 | 2 | 3 | 4;
+  if (numeric >= 1 && numeric <= 3) {
+    return numeric as 1 | 2 | 3;
   }
   return 1;
 }
@@ -35,6 +35,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
 
   const resolvedParams = (await searchParams) ?? {};
   const step = normalizeStep(resolvedParams.step);
+  const presetParam = resolvedParams.preset;
 
   // Keep this lookup commented out with redirect guard while onboarding UI is in preview mode.
   // const workspaces = await getUserWorkspaces(user.userId);
@@ -47,6 +48,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
     <OnboardingFlow
       initialStep={step}
       initialWorkspaceName={defaultWorkspaceNameFromProfile(session.user.fullName)}
+      initialPresetParam={presetParam}
     />
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { motion } from "framer-motion";
-import { Copy, Play } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Copy, Play, Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,50 +14,73 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { transformToken } from "@/lib/codegen";
+import type { MotionTokenItem } from "@/lib/tokn-constants";
 import { useSelectedToken, useTokenStore } from "@/lib/token-store";
+import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import { flushWorkspaceTokenPatches } from "@/lib/workspace-token-sync";
 
-import { toFramerEasing, tokenTransition } from "./shared";
+import { LabPreviewMotionBox } from "./lab-preview-motion-box";
+import { toFramerEasing } from "./shared";
 
 type PreviewPanelProps = {
   additiveMotion: boolean;
   relativeUnits: boolean;
 };
 
-function getTokenDescriptor(tokenName: string) {
-  const parts = tokenName.toLowerCase().split(".");
-  return parts[1] ?? "";
-}
-
-function getPreviewKind(tokenName: string, category: string) {
-  const descriptor = getTokenDescriptor(tokenName);
-
-  if (["button", "toggle", "switch", "checkbox", "radio", "tabs"].some((word) => descriptor.includes(word))) {
-    return "button" as const;
-  }
-  if (["card", "accordion"].some((word) => descriptor.includes(word))) {
-    return "card" as const;
-  }
-  if (
-    ["modal", "dialog", "sheet", "drawer", "popover", "dropdown-menu", "sidebar", "context-menu", "navigation-menu", "menubar"].some(
-      (word) => descriptor.includes(word),
-    )
-  ) {
-    return "modal" as const;
-  }
-  if (category === "feedback") return "toast" as const;
-  if (category === "spring") return "dot" as const;
-  if (category === "exit") return "exit" as const;
-  return "enter" as const;
-}
-
 export function PreviewPanel({ additiveMotion, relativeUnits }: PreviewPanelProps) {
-  const { replayKey, replay, workspaceRole, workspaceId } = useTokenStore();
+  const {
+    replayKey,
+    replay,
+    workspaceRole,
+    workspaceId,
+    tokens,
+    undoStack,
+    redoStack,
+    undoTokenEdit,
+    redoTokenEdit,
+    previewCompareMode,
+    previewCompareTokenId,
+    setPreviewCompareMode,
+    setPreviewCompareTokenId,
+  } = useTokenStore();
   const token = useSelectedToken();
   const [saving, setSaving] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<"json" | "tailwind" | "css" | "framerMotion">("json");
+  const [publishedOverlay, setPublishedOverlay] = useState<Partial<MotionTokenItem> | null>(null);
   const canEditTokens = workspaceRole === "owner" || workspaceRole === "editor";
+
+  useEffect(() => {
+    if (!token || !workspaceId || previewCompareMode !== "published") {
+      setPublishedOverlay(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const res = await fetch(
+        `/api/workspaces/${workspaceId}/tokens/${token.id}/published-motion`,
+        workspaceApiFetchInit,
+      );
+      const json = (await res.json().catch(() => null)) as { motion?: Partial<MotionTokenItem> } | null;
+      if (cancelled) return;
+      if (res.ok && json?.motion) setPublishedOverlay(json.motion);
+      else setPublishedOverlay(null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token?.id, workspaceId, previewCompareMode]);
+
+  const compareRightToken = useMemo((): MotionTokenItem | null => {
+    if (!token) return null;
+    if (previewCompareMode === "token" && previewCompareTokenId) {
+      return tokens.find((t) => t.id === previewCompareTokenId) ?? null;
+    }
+    if (previewCompareMode === "published" && publishedOverlay) {
+      return { ...token, ...publishedOverlay };
+    }
+    return null;
+  }, [token, previewCompareMode, previewCompareTokenId, tokens, publishedOverlay]);
 
   const exportCode = useMemo(() => {
     if (!token) return { framerMotion: "", css: "", tailwind: "", json: "" };
@@ -199,15 +221,70 @@ export function PreviewPanel({ additiveMotion, relativeUnits }: PreviewPanelProp
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Motion Lab / {token.name}
         </p>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <h1 className="text-[34px] font-semibold tracking-tight text-foreground">Motion Editor</h1>
+        <div className="mt-1 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[34px] font-semibold tracking-tight text-foreground">Motion Editor</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-2"
+                disabled={undoStack.length === 0}
+                onClick={() => undoTokenEdit()}
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-2"
+                disabled={redoStack.length === 0}
+                onClick={() => redoTokenEdit()}
+              >
+                <Redo2 className="h-3.5 w-3.5" />
+              </Button>
+              <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span>Compare</span>
+                <select
+                  className="h-8 rounded-md border border-border bg-background px-2 text-[11px] text-foreground"
+                  value={previewCompareMode}
+                  onChange={(e) => {
+                    const v = e.target.value as typeof previewCompareMode;
+                    setPreviewCompareMode(v);
+                  }}
+                >
+                  <option value="none">Off</option>
+                  <option value="published">Latest publish</option>
+                  <option value="token">Token</option>
+                </select>
+              </label>
+              {previewCompareMode === "token" ? (
+                <select
+                  className="h-8 max-w-[200px] rounded-md border border-border bg-background px-2 font-mono text-[10px] text-foreground"
+                  value={previewCompareTokenId ?? ""}
+                  onChange={(e) => setPreviewCompareTokenId(e.target.value || null)}
+                >
+                  <option value="">Pick token</option>
+                  {tokens
+                    .filter((t) => t.id !== token.id && t.name.trim())
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                </select>
+              ) : null}
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => {
               void saveToken();
             }}
             disabled={!canEditTokens || !workspaceId || saving}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save Token"}
           </button>
@@ -223,72 +300,30 @@ export function PreviewPanel({ additiveMotion, relativeUnits }: PreviewPanelProp
               backgroundSize: "20px 20px",
             }}
           >
-            <div className="flex h-full items-center justify-center">
-              <div className="flex flex-col items-center gap-10">
-                <motion.div
-                  key={replayKey}
-                  initial={{
-                    opacity: additiveMotion ? token.opacityStart : 1,
-                    y: additiveMotion ? token.yOffset : 0,
-                    scale: additiveMotion ? token.scaleStart : 1,
-                  }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={tokenTransition(token)}
-                  className="flex h-32 w-32 items-center justify-center"
+            <div className="flex h-full items-center justify-center px-4 py-6">
+              <div className="flex w-full max-w-4xl flex-col items-center gap-8">
+                <div
+                  className={
+                    compareRightToken
+                      ? "flex w-full flex-row flex-wrap items-start justify-center gap-8"
+                      : "flex flex-col items-center gap-8"
+                  }
                 >
-                  {(() => {
-                    const previewKind = getPreviewKind(token.name, token.category);
-
-                    if (previewKind === "button") {
-                      return (
-                        <div className="rounded-md border border-[#4c3dc9]/25 bg-white px-4 py-2 text-[13px] font-semibold text-[#372d89] shadow-[0_10px_24px_-16px_rgba(31,28,86,0.4)]">
-                          Continue
-                        </div>
-                      );
-                    }
-
-                    if (previewKind === "card") {
-                      return (
-                        <div className="w-28 rounded-lg border border-border bg-white p-3 shadow-[0_16px_30px_-24px_rgba(31,28,86,0.35)]">
-                          <div className="h-2 w-12 rounded bg-[#4c3dc9]/18" />
-                          <div className="mt-2 h-1.5 w-18 rounded bg-muted" />
-                          <div className="mt-1.5 h-1.5 w-14 rounded bg-muted" />
-                        </div>
-                      );
-                    }
-
-                    if (previewKind === "modal") {
-                      return (
-                        <div className="relative h-28 w-32 rounded-xl bg-black/8 p-2">
-                          <div className="absolute inset-0 rounded-xl bg-black/14 backdrop-blur-[1px]" />
-                          <div className="relative mx-auto mt-4 w-24 rounded-lg border border-border bg-white p-3 shadow-[0_18px_30px_-24px_rgba(31,28,86,0.45)]">
-                            <div className="h-2 w-12 rounded bg-[#4c3dc9]/18" />
-                            <div className="mt-2 h-1.5 w-16 rounded bg-muted" />
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (previewKind === "toast") {
-                      return (
-                        <div className="w-28 rounded-lg border border-[#4c3dc9]/15 bg-[#111827] px-3 py-2 text-left text-[11px] text-white shadow-[0_18px_30px_-22px_rgba(31,28,86,0.65)]">
-                          <p className="font-semibold">Saved</p>
-                          <p className="mt-0.5 text-white/70">Your changes were applied.</p>
-                        </div>
-                      );
-                    }
-
-                    if (previewKind === "dot") {
-                      return <div className="h-12 w-12 rounded-xl bg-[#4c3dc9]" />;
-                    }
-
-                    if (previewKind === "exit") {
-                      return <div className="h-1.5 w-20 rounded-full bg-[#7a7891]" />;
-                    }
-
-                    return <div className="h-9 w-9 rounded-xl border-2 border-[#4c3dc9] bg-transparent" />;
-                  })()}
-                </motion.div>
+                  <LabPreviewMotionBox
+                    token={token}
+                    motionKey={replayKey}
+                    additiveMotion={additiveMotion}
+                    label={compareRightToken ? "Draft" : undefined}
+                  />
+                  {compareRightToken ? (
+                    <LabPreviewMotionBox
+                      token={compareRightToken}
+                      motionKey={replayKey}
+                      additiveMotion={additiveMotion}
+                      label={previewCompareMode === "published" ? "Latest publish" : "Other token"}
+                    />
+                  ) : null}
+                </div>
 
                 <Button
                   type="button"

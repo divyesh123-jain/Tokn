@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -393,6 +394,9 @@ export function TokenLibrary() {
                             <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                               {token.name}
                             </p>
+                            {token.intent?.trim() ? (
+                              <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{token.intent.trim()}</p>
+                            ) : null}
                             {tags.length > 0 ? (
                               <div className="mt-1.5 flex flex-wrap gap-1">
                                 {tags.map((tag) => (
@@ -596,6 +600,19 @@ export function TokenLibrary() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Intent</Label>
+                  <Textarea
+                    rows={3}
+                    value={selectedToken.intent ?? ""}
+                    onChange={(event) =>
+                      updateToken(selectedToken.id, { intent: event.target.value })
+                    }
+                    className="resize-none text-xs"
+                    placeholder="Why this token exists"
+                  />
                 </div>
 
                 {selectedToken.isSpring ? (

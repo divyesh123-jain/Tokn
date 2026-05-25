@@ -336,6 +336,8 @@ Pick one and we implement directly:
 - Run `npm run db:push` after pulling latest changes to create:
   - `workspace_releases` (publish snapshots + release diffs)
   - `product_events` (analytics starter events)
+  - `motion_tokens.intent` (optional human “why this token” text; default empty string)
+- If queries fail with `column "intent" does not exist`, run **`npm run db:add-intent`** once (or `npm run db:push`).
 - Run governance starter check:
   - `npm run governance:check`
   - Remediate hardcoded motion values by replacing literals with token-driven values.

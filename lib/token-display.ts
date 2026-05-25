@@ -70,6 +70,7 @@ export function tokenSearchHaystack(token: MotionTokenItem): string {
     ...tags,
     token.easing,
     token.isSpring ? "spring" : "",
+    (token.intent ?? "").trim(),
   ]
     .join(" ")
     .toLowerCase();

@@ -18,6 +18,7 @@ import {
   cancelPendingTokenPatch as cancelPendingTokenPatchImpl,
   scheduleWorkspaceTokenPatch as scheduleWorkspaceTokenPatchImpl,
 } from "@/lib/workspace-token-sync";
+import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 
 type TokenActionDeps = {
   createTokenRemote: typeof createTokenRemoteImpl;
@@ -94,6 +95,8 @@ export async function saveTokenNameAction(id: string, name: string) {
   const ws = store.workspaceId;
   if (ws) deps().cancelPendingTokenPatch(ws, id);
 
+  useTokenStore.getState().pushHistorySnapshot();
+
   const now = deps().nowIso();
   useTokenStore.setState((s) => ({
     tokens: s.tokens.map((t) => (t.id === id ? { ...t, name: trimmed, updatedAt: now } : t)),
@@ -108,6 +111,32 @@ export async function saveTokenNameAction(id: string, name: string) {
   useTokenStore.setState((s) => ({
     tokens: s.tokens.map((t) => (t.id === id ? { ...t, ...server, pendingSync: false } : t)),
   }));
+}
+
+export async function revertTokenToPublishedMotionAction(tokenId: string) {
+  if (!canEditWorkspaceTokens()) {
+    deps().notifyError("Viewer role is read-only");
+    return;
+  }
+  const ws = useTokenStore.getState().workspaceId;
+  if (!ws) {
+    deps().notifyError("No workspace");
+    return;
+  }
+  useTokenStore.getState().pushHistorySnapshot();
+  const res = await fetch(`/api/workspaces/${ws}/tokens/${tokenId}/published-motion`, {
+    ...workspaceApiFetchInit,
+    method: "GET",
+  });
+  const json = (await res.json().catch(() => null)) as
+    | { motion?: Partial<MotionTokenItem>; error?: string }
+    | null;
+  if (!res.ok || !json?.motion) {
+    deps().notifyError(json?.error ?? "No published baseline for this token");
+    return;
+  }
+  useTokenStore.getState().updateToken(tokenId, json.motion, { skipHistory: true });
+  toast.success("Motion reset from latest release");
 }
 
 export async function createTokenAction() {

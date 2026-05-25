@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Copy, Download, Loader2, Settings, Share2, Users } from "lucide-react";
 import { toast } from "sonner";
 
+import { FirstEditTour } from "@/components/projects/first-edit-tour";
 import { MotionStudio } from "@/components/projects/motion-studio";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -19,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemePicker } from "@/components/theme/theme-picker";
 import { trackProductEvent } from "@/lib/analytics";
+import { readFirstEditTour } from "@/lib/onboarding-client";
 import {
   hasPendingPatches,
   leaveWorkspaceSession,
@@ -33,6 +35,8 @@ import type { WorkspaceSummary } from "@/lib/workspace-types";
 
 export function ProjectDashboard({ projectId }: { projectId: string }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [workspace, setWorkspace] = React.useState<WorkspaceSummary | null>(null);
   const [publishOpen, setPublishOpen] = React.useState(false);
   const [exportOpen, setExportOpen] = React.useState(false);
@@ -41,6 +45,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
   const [publishMode, setPublishMode] = React.useState<"existing" | "new">("new");
   const [version, setVersion] = React.useState("1.0.0");
   const [publishing, setPublishing] = React.useState(false);
+  const [firstEditTour, setFirstEditTour] = React.useState(false);
   const tokensHydrating = useTokenStore((s) => s.tokensHydrating);
   const tokens = useTokenStore((s) => s.tokens);
   const canPublish = workspace?.role === "owner";
@@ -164,6 +169,28 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
       void leaveWorkspaceSession(projectId);
     };
   }, [projectId, router]);
+
+  React.useEffect(() => {
+    setFirstEditTour(false);
+    let show = false;
+    if (searchParams.get("tour") === "first-edit") {
+      show = true;
+    } else {
+      const pending = readFirstEditTour(projectId);
+      if (pending && pending.step >= 0 && pending.step <= 2) {
+        show = true;
+      }
+    }
+    if (show) {
+      setFirstEditTour(true);
+    }
+    if (searchParams.get("tour") === "first-edit") {
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("tour");
+      const suffix = next.toString();
+      router.replace(suffix ? `${pathname}?${suffix}` : pathname, { scroll: false });
+    }
+  }, [projectId, pathname, router, searchParams]);
 
   React.useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -339,6 +366,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
             </div>
           ) : canPublish ? (
             <Button
+              id="project-header-publish"
               variant="default"
               size="sm"
               className="hidden gap-1.5 sm:inline-flex"
@@ -367,6 +395,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
             Share
           </Button>
           <Button
+            id="project-header-export"
             variant="outline"
             size="sm"
             className="hidden gap-1.5 sm:inline-flex"
@@ -394,8 +423,14 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
         </div>
       </header>
       <div className="min-h-0 flex-1">
-        <MotionStudio embedded workspaceName={workspace.name} />
+        <MotionStudio embedded workspaceName={workspace.name} bootIntoMotionLab={firstEditTour} />
       </div>
+
+      <FirstEditTour
+        workspaceId={projectId}
+        active={firstEditTour}
+        onRequestClose={() => setFirstEditTour(false)}
+      />
 
       <Dialog open={publishOpen && canPublish} onOpenChange={setPublishOpen}>
         <DialogContent>

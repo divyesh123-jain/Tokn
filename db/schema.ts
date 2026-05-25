@@ -98,6 +98,7 @@ export const motionTokens = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     publishedVersion: text("published_version"),
     deprecated: boolean("deprecated").notNull(),
+    intent: text("intent").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
     updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),

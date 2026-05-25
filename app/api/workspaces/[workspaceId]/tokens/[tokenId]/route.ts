@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth-helpers";
 import { getTokenNameValidationError } from "@/lib/token-name";
 import { motionTokenDbRowToItem, motionTokenItemToDbFields } from "@/lib/token-db";
+import { tokenEasingSchema } from "@/lib/token-easing";
 
 const tokenCategorySchema = z.enum(["enter", "exit", "spring", "feedback"]);
 
@@ -24,23 +25,16 @@ const tokenNameSchema = z
     }
   });
 
-const easingSchema = z
-  .enum(["linear", "ease", "ease-in", "ease-out", "ease-in-out"])
-  .or(
-    z.string().regex(
-      /^cubic-bezier\(\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*,\s*-?\d*\.?\d+\s*\)$/,
-      "Easing must be a known preset or a valid cubic-bezier()",
-    ),
-  );
-
 const uuidParam = z.string().uuid();
+
+const intentSchema = z.string().max(600);
 
 const tokenPatchSchema = z.object({
   name: tokenNameSchema.optional(),
   category: tokenCategorySchema.optional(),
   durationMs: z.number().int().min(0).max(10_000).optional(),
   delayMs: z.number().int().min(0).max(5_000).optional(),
-  easing: easingSchema.optional(),
+  easing: tokenEasingSchema.optional(),
   yOffset: z.number().int().min(-1_000).max(1_000).optional(),
   scaleStart: z.number().min(0.01).max(3).optional(),
   opacityStart: z.number().min(0).max(1).optional(),
@@ -49,6 +43,7 @@ const tokenPatchSchema = z.object({
   springDamping: z.number().min(0.1).max(100).optional(),
   springMass: z.number().min(0.1).max(20).optional(),
   deprecated: z.boolean().optional(),
+  intent: intentSchema.optional(),
 });
 
 export async function PATCH(
@@ -111,6 +106,7 @@ export async function PATCH(
     springDamping: number;
     springMass: number;
     deprecated: boolean;
+    intent?: string | null;
   };
 
   const existingItem = motionTokenDbRowToItem(existing);
@@ -146,6 +142,7 @@ export async function PATCH(
     springDamping: nextItem.springDamping,
     springMass: nextItem.springMass,
     deprecated: nextItem.deprecated,
+    intent: nextItem.intent ?? "",
   });
 
   const updated = await db

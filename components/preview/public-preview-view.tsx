@@ -170,7 +170,12 @@ export function PublicPreviewView({
                 className="rounded-xl border border-border bg-card p-4 transition hover:border-primary/40"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="font-mono text-sm text-foreground">{token.name}</h2>
+                  <div className="min-w-0">
+                    <h2 className="font-mono text-sm text-foreground">{token.name}</h2>
+                    {token.intent?.trim() ? (
+                      <p className="mt-1 text-xs text-muted-foreground">{token.intent.trim()}</p>
+                    ) : null}
+                  </div>
                   <span
                     className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase"
                     style={{

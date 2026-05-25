@@ -35,6 +35,7 @@ export type MotionTokenItem = {
   springDamping: number;
   springMass: number;
   deprecated: boolean;
+  intent: string;
   /** ISO 8601 from DB or client when the token last changed */
   updatedAt?: string;
   /** User id of the last editor in team workspaces */
@@ -64,9 +65,10 @@ export const TOKEN_DEFAULTS: Omit<MotionTokenItem, "id"> = {
   isSpring: false,
   ...SPRING_DEFAULTS,
   deprecated: false,
+  intent: "",
 };
 
-const initialMotionTokensBase: Omit<MotionTokenItem, "pendingSync">[] = [
+const initialMotionTokensBase: Omit<MotionTokenItem, "pendingSync" | "intent">[] = [
   {
     id: "tok_01",
     name: "enter.default",
@@ -262,7 +264,7 @@ const initialMotionTokensBase: Omit<MotionTokenItem, "pendingSync">[] = [
 ];
 
 export const initialMotionTokens: MotionTokenItem[] = initialMotionTokensBase.map(
-  (token) => ({ ...token, pendingSync: false }),
+  (token) => ({ ...token, intent: "", pendingSync: false }),
 );
 
 export const categoryOrder: MotionTokenCategory[] = [

@@ -17,9 +17,14 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MotionPresetLoopDemo } from "@/components/onboarding/motion-preset-loop-demo";
+import {
+  clearOnboardingWizard,
+  readOnboardingWizard,
+  writeOnboardingWizard,
+} from "@/lib/onboarding-client";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import {
-  DEFAULT_WORKSPACE_TOKEN_COUNT,
   MOTION_PRESET_LABELS,
   MOTION_PRESETS,
   type MotionPreset,
@@ -28,11 +33,12 @@ import type { WorkspaceKind } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
 
 type OnboardingFlowProps = {
-  initialStep: 1 | 2 | 3 | 4;
+  initialStep: 1 | 2 | 3;
   initialWorkspaceName: string;
+  initialPresetParam?: string;
 };
 
-const STEP_COUNT = 4;
+const STEP_COUNT = 3;
 
 const PRESET_SUMMARIES: Record<MotionPreset, string> = {
   "apple-smooth": "Fluid, 80% damping, 1.2s duration",
@@ -40,10 +46,10 @@ const PRESET_SUMMARIES: Record<MotionPreset, string> = {
   minimal: "Subtle, 40% damping, 0.8s duration",
 };
 
-function parseStep(value: string | undefined): 1 | 2 | 3 | 4 {
+function parseStep(value: string | undefined): 1 | 2 | 3 {
   const numeric = Number(value ?? "1");
   if (numeric >= 1 && numeric <= STEP_COUNT) {
-    return numeric as 1 | 2 | 3 | 4;
+    return numeric as 1 | 2 | 3;
   }
   return 1;
 }
@@ -55,28 +61,51 @@ function parsePreset(value: string | undefined): MotionPreset | null {
   return null;
 }
 
-export function OnboardingFlow({ initialStep, initialWorkspaceName }: OnboardingFlowProps) {
+function presetFromParam(value: string | undefined): MotionPreset {
+  const p = parsePreset(value);
+  return p ?? "minimal";
+}
+
+export function OnboardingFlow({
+  initialStep,
+  initialWorkspaceName,
+  initialPresetParam,
+}: OnboardingFlowProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [step, setStep] = React.useState<1 | 2 | 3 | 4>(initialStep);
+  const [step, setStep] = React.useState<1 | 2 | 3>(initialStep);
   const [workspaceName, setWorkspaceName] = React.useState(initialWorkspaceName);
   const [workspaceKind, setWorkspaceKind] = React.useState<WorkspaceKind>("individual");
-  const [preset, setPreset] = React.useState<MotionPreset>("minimal");
+  const [preset, setPreset] = React.useState<MotionPreset>(() => presetFromParam(initialPresetParam));
   const [creating, setCreating] = React.useState(false);
+  const mergedProgressRef = React.useRef(false);
+
+  const persistWizard = React.useCallback(
+    (nextStep: 1 | 2 | 3, nextPreset: MotionPreset, name: string) => {
+      writeOnboardingWizard({
+        step: nextStep,
+        workspaceName: name.trim() || initialWorkspaceName,
+        preset: nextPreset,
+      });
+    },
+    [initialWorkspaceName],
+  );
 
   const replaceStepInUrl = React.useCallback(
-    (nextStep: 1 | 2 | 3 | 4, nextPreset?: MotionPreset) => {
+    (nextStep: 1 | 2 | 3, nextPreset?: MotionPreset) => {
       const params = new URLSearchParams(searchParams.toString());
       params.set("step", String(nextStep));
+      const resolvedPreset = nextPreset ?? preset;
+      params.set("preset", resolvedPreset);
       if (nextPreset) {
-        params.set("preset", nextPreset);
         setPreset(nextPreset);
       }
       router.replace(`/onboarding?${params.toString()}`);
       setStep(nextStep);
+      persistWizard(nextStep, nextPreset ?? preset, workspaceName);
     },
-    [router, searchParams],
+    [router, searchParams, preset, workspaceName, persistWizard],
   );
 
   React.useEffect(() => {
@@ -92,38 +121,34 @@ export function OnboardingFlow({ initialStep, initialWorkspaceName }: Onboarding
   }, [preset, searchParams, step]);
 
   React.useEffect(() => {
-    setWorkspaceName(initialWorkspaceName);
-  }, [initialWorkspaceName]);
-
-  React.useEffect(() => {
-    if (step !== 4) return;
-
-    // Temporary for UI iteration: disable auto-redirect so completion screen stays visible.
-    // const timeout = window.setTimeout(() => {
-    //   router.replace("/dashboard");
-    // }, 2200);
-
-    // return () => {
-    //   window.clearTimeout(timeout);
-    // };
-  }, [router, step]);
-
-  React.useEffect(() => {
-    if (step !== 4) return;
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Enter") {
-        router.replace("/dashboard");
-      }
+    if (mergedProgressRef.current) return;
+    mergedProgressRef.current = true;
+    const stored = readOnboardingWizard();
+    if (!stored) return;
+    const params = new URLSearchParams(searchParams.toString());
+    const urlStep = parseStep(params.get("step") ?? undefined);
+    const urlPreset = parsePreset(params.get("preset") ?? undefined);
+    const nextStep = Math.min(3, Math.max(urlStep, stored.step)) as 1 | 2 | 3;
+    const nextPreset = urlPreset ?? stored.preset;
+    const qs = new URLSearchParams();
+    qs.set("step", String(nextStep));
+    qs.set("preset", nextPreset);
+    if (nextStep !== urlStep || !urlPreset) {
+      router.replace(`/onboarding?${qs.toString()}`);
     }
+    if (stored.workspaceName?.trim()) {
+      setWorkspaceName(stored.workspaceName.trim());
+    }
+    setPreset(nextPreset);
+    setStep(nextStep);
+  }, [router, searchParams]);
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [router, step]);
+  function finishLater() {
+    persistWizard(step, preset, workspaceName);
+    router.push("/projects");
+  }
 
-  const isFullscreenStep = step === 1 || step === 2 || step === 3 || step === 4;
+  const isFullscreenStep = step === 1 || step === 2 || step === 3;
 
   function chooseWorkspaceKind(kind: WorkspaceKind) {
     setWorkspaceKind(kind);
@@ -157,7 +182,16 @@ export function OnboardingFlow({ initialStep, initialWorkspaceName }: Onboarding
         return;
       }
 
-      replaceStepInUrl(4, preset);
+      const json = (await res.json().catch(() => null)) as { workspace?: { id: string } } | null;
+      const id = json?.workspace?.id;
+      if (id) {
+        clearOnboardingWizard();
+        router.replace(`/projects/${id}?tour=first-edit`);
+        return;
+      }
+
+      toast.error("Workspace created but response was incomplete. Open Projects from the menu.");
+      router.push("/projects");
     } finally {
       setCreating(false);
     }
@@ -176,44 +210,30 @@ export function OnboardingFlow({ initialStep, initialWorkspaceName }: Onboarding
           isFullscreenStep ? "min-h-screen" : "mx-auto max-w-3xl",
         )}
       >
-        {step !== 1 && step !== 2 && step !== 3 && step !== 4 ? (
-          <>
-            <div className="mb-8 flex items-center justify-between gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">Set up your first workspace</h1>
-              <span className="text-sm text-muted-foreground">Step {step} of {STEP_COUNT}</span>
-            </div>
-
-            <div className="mb-8 grid grid-cols-4 gap-2">
-              {[1, 2, 3, 4].map((index) => (
-                <div
-                  key={index}
-                  className={cn(
-                    "h-1.5 rounded-full bg-muted",
-                    index <= step ? "bg-primary" : "bg-muted",
-                  )}
-                />
-              ))}
-            </div>
-          </>
-        ) : null}
-
         {step === 1 ? (
           <section className="relative min-h-screen overflow-hidden bg-background">
             <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-muted/35 via-background to-background" />
 
-            <header className="relative z-10 flex h-16 items-center px-6 md:px-10">
+            <header className="relative z-10 flex h-16 items-center justify-between gap-3 px-6 md:px-10">
               <Link href="/" className="inline-flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-md bg-primary font-mono text-[10px] font-medium uppercase tracking-tight text-primary-foreground">
                   tk
                 </span>
                 <span className="text-lg font-medium tracking-tight text-foreground">tokn</span>
               </Link>
+              <button
+                type="button"
+                onClick={finishLater}
+                className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Finish later
+              </button>
             </header>
 
             <div className="relative z-10 flex min-h-[calc(100vh-4rem)] w-full flex-col items-center px-6 pb-8 md:px-10 md:pb-10">
 
               <div className="mt-14 flex items-center gap-2">
-                {[1, 2, 3, 4].map((index) => (
+                {[1, 2, 3].map((index) => (
                   <span
                     key={index}
                     className={cn(
@@ -283,30 +303,36 @@ export function OnboardingFlow({ initialStep, initialWorkspaceName }: Onboarding
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(var(--color-border)_0.8px,transparent_0.8px)] bg-size-[16px_16px] opacity-60" />
             <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-background/20 via-background/70 to-background" />
 
-            <header className="relative z-10 flex h-16 items-center justify-between px-6 md:px-10">
+            <header className="relative z-10 flex h-16 items-center justify-between gap-3 px-6 md:px-10">
               <Link href="/" className="text-3xl font-semibold tracking-tight text-primary" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>
                 tokn
               </Link>
 
               <div className="flex items-center gap-4">
                 <span className="text-sm font-medium text-primary">Onboarding</span>
-               
+                <button
+                  type="button"
+                  onClick={finishLater}
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Finish later
+                </button>
               </div>
             </header>
 
             <div className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-4xl flex-col px-6 pb-10 pt-12 md:px-10">
               <div className="mx-auto flex items-center gap-2">
-                {[1, 2, 3, 4].map((index) => (
+                {[1, 2, 3].map((index) => (
                   <span
                     key={index}
                     className={cn(
                       "h-1 rounded-full transition-all",
-                      index <= 2 ? "w-13 bg-primary" : "w-13 bg-muted",
+                      index <= step ? "w-13 bg-primary" : "w-13 bg-muted",
                     )}
                   />
                 ))}
               </div>
-              <p className="mx-auto mt-3 text-center font-mono text-[10px] tracking-[0.2em] text-muted-foreground">STEP 2 OF 4</p>
+              <p className="mx-auto mt-3 text-center font-mono text-[10px] tracking-[0.2em] text-muted-foreground">STEP 2 OF {STEP_COUNT}</p>
 
               <h2
                 className="mx-auto mt-10 text-center text-balance text-[52px] leading-[1.06] tracking-[-0.02em] text-primary md:text-[66px]"
@@ -375,13 +401,20 @@ export function OnboardingFlow({ initialStep, initialWorkspaceName }: Onboarding
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(var(--color-border)_0.8px,transparent_0.8px)] bg-size-[16px_16px] opacity-50" />
             <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-background/20 via-background/65 to-background" />
 
-            <header className="relative z-10 flex h-16 items-center justify-between px-6 md:px-10">
+            <header className="relative z-10 flex h-16 items-center justify-between gap-3 px-6 md:px-10">
               <Link href="/" className="text-3xl font-semibold tracking-tight text-primary" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>
                 tokn
               </Link>
 
               <div className="flex items-center gap-4">
                 <span className="text-sm font-medium text-primary">Onboarding</span>
+                <button
+                  type="button"
+                  onClick={finishLater}
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Finish later
+                </button>
                 <button
                   type="button"
                   aria-label="Help"
@@ -394,17 +427,17 @@ export function OnboardingFlow({ initialStep, initialWorkspaceName }: Onboarding
 
             <div className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl flex-col px-6 pb-6 pt-8 md:px-10 md:pb-8 md:pt-9">
               <div className="mx-auto flex items-center gap-2">
-                {[1, 2, 3, 4].map((index) => (
+                {[1, 2, 3].map((index) => (
                   <span
                     key={index}
                     className={cn(
                       "h-1 rounded-full transition-all",
-                      index <= 3 ? "w-13 bg-primary" : "w-13 bg-muted",
+                      index <= step ? "w-13 bg-primary" : "w-13 bg-muted",
                     )}
                   />
                 ))}
               </div>
-              <p className="mx-auto mt-3 text-center font-mono text-[10px] tracking-[0.2em] text-muted-foreground">STEP 3 OF 4</p>
+              <p className="mx-auto mt-3 text-center font-mono text-[10px] tracking-[0.2em] text-muted-foreground">STEP 3 OF {STEP_COUNT}</p>
 
               <h2
                 className="mx-auto mt-6 text-center text-balance text-[46px] leading-[1.05] tracking-[-0.02em] text-foreground md:text-[58px]"
@@ -414,7 +447,7 @@ export function OnboardingFlow({ initialStep, initialWorkspaceName }: Onboarding
               </h2>
 
               <p className="mx-auto mt-3 max-w-2xl text-center text-base text-muted-foreground md:text-lg">
-                This defines the default easing and physics for your initial tokens.
+                Same preview motion on each card — pick the curve that matches your product.
               </p>
 
               <div className="mx-auto mt-8 grid w-full max-w-5xl gap-4 md:grid-cols-3">
@@ -431,14 +464,12 @@ export function OnboardingFlow({ initialStep, initialWorkspaceName }: Onboarding
                       )}
                     >
                       <div className="rounded-lg border border-border bg-muted/35 p-4">
-                        <div className="mb-5 flex items-center justify-center text-primary/80">
+                        <div className="mb-3 flex items-center justify-center text-primary/80">
                           {option === "apple-smooth" ? <Sparkles className="h-8 w-8" /> : null}
                           {option === "linear-snappy" ? <ArrowRight className="h-8 w-8" /> : null}
                           {option === "minimal" ? <Waves className="h-8 w-8" /> : null}
                         </div>
-                        <div className="h-1 w-full rounded-full bg-border/80">
-                          <div className={cn("h-1 rounded-full bg-primary", selected ? "w-1/2" : "w-1/3")} />
-                        </div>
+                        <MotionPresetLoopDemo preset={option} />
                       </div>
 
                       <p className={cn("mt-5 text-[32px] leading-none tracking-tight", selected ? "text-primary" : "text-foreground")} style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>
@@ -480,87 +511,6 @@ export function OnboardingFlow({ initialStep, initialWorkspaceName }: Onboarding
           </section>
         ) : null}
 
-        {step === 4 ? (
-          <section className="relative min-h-screen overflow-hidden bg-background">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(var(--color-border)_0.8px,transparent_0.8px)] bg-size-[16px_16px] opacity-50" />
-            <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-background/25 via-background/70 to-background" />
-
-            <header className="relative z-10 flex h-16 items-center justify-between px-6 md:px-10">
-              <Link href="/" className="text-3xl font-semibold tracking-tight text-primary" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>
-                tokn
-              </Link>
-
-             
-            </header>
-
-            <div className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-4xl flex-col items-center px-6 pb-8 pt-6 md:px-10">
-              <div className="mx-auto flex items-center gap-2">
-                {[1, 2, 3, 4].map((index) => (
-                  <span
-                    key={index}
-                    className={cn(
-                      "h-1 rounded-full transition-all",
-                      index <= 3 ? "w-13 bg-primary" : "w-13 bg-muted",
-                    )}
-                  />
-                ))}
-              </div>
-              <p className="mx-auto mt-3 text-center font-mono text-[10px] tracking-[0.2em] text-primary">STEP 3: SUCCESS</p>
-
-              <div className="relative mt-5 flex h-64 w-64 items-center justify-center md:h-72 md:w-72">
-                <div className="absolute inset-2 rounded-full border border-border/80" />
-                <div className="absolute inset-7 rounded-full border border-border/60" />
-
-                <div className="absolute left-1/2 top-7 h-10 w-10 -translate-x-1/2 rounded-lg bg-primary text-primary-foreground shadow-sm" />
-                <div className="absolute left-1/2 bottom-7 h-10 w-10 -translate-x-1/2 rounded-lg bg-primary/15 text-primary shadow-sm" />
-                <div className="absolute left-7 top-1/2 h-10 w-10 -translate-y-1/2 rounded-lg border border-border bg-card text-primary shadow-sm" />
-                <div className="absolute right-7 top-1/2 h-10 w-10 -translate-y-1/2 rounded-lg border border-border bg-card text-primary shadow-sm" />
-                <div className="absolute left-8 top-10 h-10 w-10 -rotate-6 rounded-lg border border-border bg-card text-primary shadow-sm" />
-                <div className="absolute right-8 top-10 h-10 w-10 rotate-6 rounded-lg border border-border bg-card text-primary shadow-sm" />
-                <div className="absolute left-8 bottom-10 h-10 w-10 rotate-6 rounded-lg border border-border bg-card text-primary shadow-sm" />
-                <div className="absolute right-8 bottom-10 h-10 w-10 -rotate-6 rounded-lg border border-border bg-card text-primary shadow-sm" />
-
-                <div className="absolute left-1/2 top-7 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-lg font-mono text-[11px] font-semibold text-primary-foreground">md</div>
-                <div className="absolute left-1/2 bottom-7 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-lg font-mono text-[11px] font-semibold text-primary">dr</div>
-                <div className="absolute left-7 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg font-mono text-[11px] font-semibold text-primary">kf</div>
-                <div className="absolute right-7 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg font-mono text-[11px] font-semibold text-primary">ln</div>
-                <div className="absolute left-8 top-10 flex h-10 w-10 -rotate-6 items-center justify-center rounded-lg font-mono text-[11px] font-semibold text-primary">tk</div>
-                <div className="absolute right-8 top-10 flex h-10 w-10 rotate-6 items-center justify-center rounded-lg font-mono text-[11px] font-semibold text-primary">sp</div>
-                <div className="absolute left-8 bottom-10 flex h-10 w-10 rotate-6 items-center justify-center rounded-lg font-mono text-[11px] font-semibold text-primary">bz</div>
-                <div className="absolute right-8 bottom-10 flex h-10 w-10 -rotate-6 items-center justify-center rounded-lg font-mono text-[11px] font-semibold text-primary">st</div>
-
-                <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-xl border border-border bg-card text-[46px] leading-none text-primary" style={{ fontFamily: "var(--font-serif), Georgia, serif" }}>
-                  {DEFAULT_WORKSPACE_TOKEN_COUNT}
-                </div>
-              </div>
-
-              <h2
-                className="mx-auto mt-2 text-center text-balance text-[66px] leading-[0.98] tracking-[-0.02em] text-foreground"
-                style={{ fontFamily: "var(--font-serif), Georgia, serif" }}
-              >
-                Your {DEFAULT_WORKSPACE_TOKEN_COUNT} tokens are ready
-              </h2>
-
-              <p className="mx-auto mt-4 max-w-2xl text-center text-[34px] leading-[1.3] text-muted-foreground md:text-[36px]">
-                We&apos;ve pre-generated your core motion presets. Your atelier is now open.
-              </p>
-
-              <Button
-                onClick={() => router.replace("/dashboard")}
-                className="mt-10 h-12 min-w-90 cursor-pointer text-lg font-medium"
-              >
-                Enter Dashboard -&gt;
-              </Button>
-
-              <p className="mt-5 text-center text-xs text-muted-foreground">
-                Press <span className="inline-flex h-5 items-center rounded-none border border-border px-1.5 font-mono text-[10px] text-foreground">ENTER</span> to continue
-              </p>
-
-             
-    
-            </div>
-          </section>
-        ) : null}
       </div>
     </main>
   );
