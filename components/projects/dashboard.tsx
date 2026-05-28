@@ -8,6 +8,9 @@ import { toast } from "sonner";
 
 import { FirstEditTour } from "@/components/projects/first-edit-tour";
 import { MotionStudio } from "@/components/projects/motion-studio";
+import { WorkspaceIdentityBadge } from "@/components/workspace/workspace-identity-badge";
+import { WorkspaceScopedBanner } from "@/components/workspace/workspace-scoped-banner";
+import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,15 +24,15 @@ import { Label } from "@/components/ui/label";
 import { ThemePicker } from "@/components/theme/theme-picker";
 import { trackProductEvent } from "@/lib/analytics";
 import { readFirstEditTour } from "@/lib/onboarding-client";
+import type { MotionTokenItem } from "@/lib/tokn-constants";
+import { scheduleRouterAction } from "@/lib/safe-router";
 import {
   hasPendingPatches,
   leaveWorkspaceSession,
   useTokenStore,
 } from "@/lib/token-store";
-import type { MotionTokenItem } from "@/lib/tokn-constants";
-import { scheduleRouterAction } from "@/lib/safe-router";
+import { workspacePreviewUrl } from "@/lib/workspace-identity";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
-import { buildWorkspacePreviewSlug } from "@/lib/workspace-slug";
 import { cn } from "@/lib/utils";
 import type { WorkspaceSummary } from "@/lib/workspace-types";
 
@@ -38,6 +41,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [workspace, setWorkspace] = React.useState<WorkspaceSummary | null>(null);
+  const [allWorkspaces, setAllWorkspaces] = React.useState<WorkspaceSummary[]>([]);
   const [publishOpen, setPublishOpen] = React.useState(false);
   const [exportOpen, setExportOpen] = React.useState(false);
   const [exporting, setExporting] = React.useState(false);
@@ -126,9 +130,10 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
         tokens: [],
         selectedId: null,
       });
-      const [wRes, tRes] = await Promise.all([
+      const [wRes, tRes, listRes] = await Promise.all([
         fetch(`/api/workspaces/${projectId}`, workspaceApiFetchInit),
         fetch(`/api/workspaces/${projectId}/tokens`, workspaceApiFetchInit),
+        fetch("/api/workspaces", workspaceApiFetchInit),
       ]);
       if (cancelled) return;
       if (wRes.status === 401 || tRes.status === 401) {
@@ -152,6 +157,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
 
       const wJson = await safeJson<{ workspace?: WorkspaceSummary }>(wRes);
       const tJson = await safeJson<{ tokens?: MotionTokenItem[] }>(tRes);
+      const listJson = await safeJson<{ workspaces?: WorkspaceSummary[] }>(listRes);
       if (!wJson?.workspace || !Array.isArray(tJson?.tokens)) {
         toast.error("Could not load project data.");
         scheduleRouterAction(() => router.replace("/projects"));
@@ -162,6 +168,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
       useTokenStore.getState().setWorkspaceContext(projectId, ws.role);
       useTokenStore.getState().replaceTokens(tJson.tokens, tJson.tokens[0]?.id ?? null);
       setWorkspace(ws);
+      setAllWorkspaces(listJson?.workspaces ?? [ws]);
     }
     void run();
     return () => {
@@ -212,12 +219,22 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
     );
   }
 
+  function switchWorkspace(nextId: string) {
+    if (nextId === projectId) return;
+    if (hasPendingPatches(projectId)) {
+      const ok = window.confirm(
+        "You have unsaved changes in this workspace. Leave without saving?",
+      );
+      if (!ok) return;
+    }
+    scheduleRouterAction(() => router.push(`/projects/${nextId}`));
+  }
+
   async function sharePublicPreview() {
     if (!workspace) return;
     const base =
       typeof window !== "undefined" ? window.location.origin : "https://tokn.so";
-    const slug = workspace.slug || buildWorkspacePreviewSlug(workspace.name, workspace.id);
-    const url = `${base}/preview/${slug}`;
+    const url = workspacePreviewUrl(base, workspace);
     await navigator.clipboard.writeText(url);
     toast.success("Public preview URL copied");
   }
@@ -261,8 +278,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
 
       const base =
         typeof window !== "undefined" ? window.location.origin : "https://tokn.so";
-      const slug = workspace.slug || buildWorkspacePreviewSlug(workspace.name, workspace.id);
-      const pinnedUrl = `${base}/preview/${slug}/v/${encodeURIComponent(json.publishedVersion)}`;
+      const pinnedUrl = workspacePreviewUrl(base, workspace, json.publishedVersion);
       await navigator.clipboard.writeText(pinnedUrl);
       toast.success(`Published ${json.publishedVersion}. Pinned URL copied.`);
       void trackProductEvent({
@@ -349,13 +365,12 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
             Projects
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="truncate text-sm font-semibold">{workspace.name}</span>
-          <span className="rounded-md bg-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent-foreground">
-            {workspace.kind === "team" ? "Team" : "Individual"}
-          </span>
-          <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
-            {workspace.role}
-          </span>
+          <WorkspaceSwitcher
+            workspaces={allWorkspaces}
+            current={workspace}
+            onSelect={switchWorkspace}
+          />
+          <WorkspaceIdentityBadge workspace={workspace} className="hidden lg:flex" />
         </div>
         <div className="flex items-center gap-2">
           {publishState.hasPublished && (!canPublish || !publishState.isDirty) ? (
@@ -423,7 +438,7 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
         </div>
       </header>
       <div className="min-h-0 flex-1">
-        <MotionStudio embedded workspaceName={workspace.name} bootIntoMotionLab={firstEditTour} />
+        <MotionStudio embedded workspace={workspace} bootIntoMotionLab={firstEditTour} />
       </div>
 
       <FirstEditTour
@@ -439,6 +454,10 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
           </DialogHeader>
 
           <div className="space-y-3">
+            <WorkspaceScopedBanner
+              workspace={workspace}
+              actionLabel="You are publishing this workspace"
+            />
             {publishState.hasPublished && publishState.currentVersion ? (
               <div className="space-y-2">
                 <Label>Publish target</Label>
@@ -503,6 +522,10 @@ export function ProjectDashboard({ projectId }: { projectId: string }) {
             </p>
           ) : (
             <div className="space-y-3">
+              <WorkspaceScopedBanner
+                workspace={workspace}
+                actionLabel="SDK export applies to this workspace"
+              />
               <p className="text-sm text-muted-foreground">
                 Exporting snapshot <span className="font-mono">{publishState.currentVersion}</span>
               </p>

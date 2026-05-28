@@ -49,6 +49,8 @@ import {
 } from "@/lib/token-actions";
 import { flushWorkspaceTokenPatches } from "@/lib/workspace-token-sync";
 import { DEFAULT_WORKSPACE_TOKEN_NAMES } from "@/lib/workspace-presets";
+import type { WorkspaceSummary } from "@/lib/workspace-types";
+import { WorkspaceIdentityBadge } from "@/components/workspace/workspace-identity-badge";
 
 import { normalizeTokenNameInput, type StudioSection } from "./shared";
 
@@ -71,12 +73,14 @@ const SIDEBAR_PANEL_COLLAPSED_KEY = "motion-studio-sidebar-panel-collapsed";
 type TokenListPanelProps = {
   activeSection: StudioSection;
   onSectionChange: (section: StudioSection) => void;
+  workspace?: Pick<WorkspaceSummary, "name" | "slug" | "kind" | "role">;
   workspaceName?: string;
 };
 
 export function TokenListPanel({
   activeSection,
   onSectionChange,
+  workspace,
   workspaceName,
 }: TokenListPanelProps) {
   const {
@@ -907,17 +911,21 @@ export function TokenListPanel({
             <ChevronLeft className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-3">
-          <Avatar className="size-8 rounded-md">
-            <AvatarFallback className="rounded-md text-sm font-bold">M</AvatarFallback>
-          </Avatar>
-          <div>
-            <p className="text-[13px] font-semibold leading-tight text-foreground">
-              {workspaceName?.trim() || "Workspace"}
-            </p>
-            <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">v1.0.0-beta</p>
+        {workspace ? (
+          <WorkspaceIdentityBadge workspace={workspace} compact className="flex-col items-start gap-1" />
+        ) : (
+          <div className="flex items-center gap-3">
+            <Avatar className="size-8 rounded-md">
+              <AvatarFallback className="rounded-md text-sm font-bold">M</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-[13px] font-semibold leading-tight text-foreground">
+                {workspaceName?.trim() || "Workspace"}
+              </p>
+              <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">v1.0.0-beta</p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-1.5">
           {SIDEBAR_ROUTES.map((item) => {

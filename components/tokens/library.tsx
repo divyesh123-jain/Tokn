@@ -30,7 +30,9 @@ import { getTokenNameValidationError } from "@/lib/token-name";
 import { useSelectedToken, useTokenStore } from "@/lib/token-store";
 import { deleteTokenAction, saveTokenNameAction } from "@/lib/token-actions";
 import { transformToken } from "@/lib/codegen";
-import { buildWorkspacePreviewSlug } from "@/lib/workspace-slug";
+import { WorkspaceIdentityBadge } from "@/components/workspace/workspace-identity-badge";
+import { workspacePreviewUrl } from "@/lib/workspace-identity";
+import type { WorkspaceSummary } from "@/lib/workspace-types";
 import {
   humanizeTokenDescriptor,
   inferTokenUiTags,
@@ -116,6 +118,27 @@ export function TokenLibrary() {
   const [shared, setShared] = useState(false);
   const [sdkCopied, setSdkCopied] = useState(false);
   const [sdkCopying, setSdkCopying] = useState(false);
+  const [workspaceMeta, setWorkspaceMeta] = useState<Pick<
+    WorkspaceSummary,
+    "name" | "slug" | "kind" | "role"
+  > | null>(null);
+
+  useEffect(() => {
+    if (!workspaceId) {
+      setWorkspaceMeta(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const res = await fetch(`/api/workspaces/${workspaceId}`, workspaceApiFetchInit);
+      const json = (await res.json().catch(() => null)) as { workspace?: WorkspaceSummary } | null;
+      if (cancelled || !json?.workspace) return;
+      setWorkspaceMeta(json.workspace);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
 
   useEffect(() => {
     if (selectedToken) setNameDraft(selectedToken.name);
@@ -198,17 +221,23 @@ export function TokenLibrary() {
   async function shareLibrary() {
     const base =
       typeof window !== "undefined" ? window.location.origin : "https://tokn.app";
-    const workspaceId = useTokenStore.getState().workspaceId;
+    const activeWorkspaceId = useTokenStore.getState().workspaceId;
     let url = `${base}/preview`;
-    if (workspaceId) {
-      const workspaceRes = await fetch(`/api/workspaces/${workspaceId}`, workspaceApiFetchInit);
+    if (workspaceMeta && activeWorkspaceId) {
+      url = workspacePreviewUrl(base, {
+        name: workspaceMeta.name,
+        id: activeWorkspaceId,
+        slug: workspaceMeta.slug,
+      });
+    } else if (activeWorkspaceId) {
+      const workspaceRes = await fetch(`/api/workspaces/${activeWorkspaceId}`, workspaceApiFetchInit);
       const workspaceJson = (await workspaceRes.json().catch(() => null)) as
-        | { workspace?: { id: string; name: string; slug?: string } }
+        | { workspace?: WorkspaceSummary }
         | null;
       const workspace = workspaceJson?.workspace;
       if (workspace) {
-        const slug = workspace.slug || buildWorkspacePreviewSlug(workspace.name, workspace.id);
-        url = `${base}/preview/${slug}`;
+        url = workspacePreviewUrl(base, workspace);
+        setWorkspaceMeta(workspace);
       }
     }
     await navigator.clipboard.writeText(url);
@@ -264,13 +293,16 @@ export function TokenLibrary() {
         <Card>
           <CardHeader className="pb-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0 space-y-2">
                 <CardTitle>Token Library</CardTitle>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Browse, preview, and copy shared motion tokens.
                 </p>
+                {workspaceMeta ? (
+                  <WorkspaceIdentityBadge workspace={workspaceMeta} />
+                ) : null}
               </div>
-              <Button variant="outline" size="sm" onClick={shareLibrary}>
+              <Button variant="outline" size="sm" onClick={shareLibrary} disabled={!workspaceMeta}>
                 {shared ? (
                   <>
                     <Check className="h-3.5 w-3.5 text-green-600" />
@@ -283,7 +315,12 @@ export function TokenLibrary() {
                   </>
                 )}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => void copyWorkspaceSdk()} disabled={sdkCopying}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void copyWorkspaceSdk()}
+                disabled={sdkCopying || !workspaceMeta}
+              >
                 {sdkCopied ? (
                   <>
                     <Check className="h-3.5 w-3.5 text-green-600" />

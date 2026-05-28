@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { SlugChangeDialog } from "@/components/workspace/slug-change-dialog";
+import { WorkspaceIdentityBadge } from "@/components/workspace/workspace-identity-badge";
+import { WorkspaceScopedBanner } from "@/components/workspace/workspace-scoped-banner";
+import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +31,7 @@ import {
 import { trackProductEvent } from "@/lib/analytics";
 import { scheduleRouterAction } from "@/lib/safe-router";
 import { formatInviteCountdown } from "@/lib/invite-display";
+import { describeSlugChangeImpact } from "@/lib/workspace-identity";
 import { sanitizeWorkspaceSlug } from "@/lib/workspace-slug";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
 import type {
@@ -69,6 +74,11 @@ export function WorkspaceSettingsPage() {
 
   const [savingName, setSavingName] = useState(false);
   const [savingSlug, setSavingSlug] = useState(false);
+  const [slugChangeOpen, setSlugChangeOpen] = useState(false);
+  const [slugChangeImpact, setSlugChangeImpact] = useState<ReturnType<
+    typeof describeSlugChangeImpact
+  > | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const [inviteEmail, setInviteEmail] = useState("");
@@ -279,6 +289,29 @@ export function WorkspaceSettingsPage() {
     }
   }
 
+  function requestSlugSave() {
+    if (!workspace || !canManageWorkspace) return;
+    const normalized = sanitizeWorkspaceSlug(slugDraft);
+    if (normalized.length < 2) {
+      toast.error("Slug must be at least 2 characters");
+      return;
+    }
+    if (normalized === workspace.slug) {
+      toast.message("Slug unchanged");
+      return;
+    }
+    const origin =
+      typeof window !== "undefined" ? window.location.origin : "https://tokn.so";
+    setSlugChangeImpact(
+      describeSlugChangeImpact({
+        origin,
+        workspace,
+        nextSlug: normalized,
+      }),
+    );
+    setSlugChangeOpen(true);
+  }
+
   async function saveSlug() {
     if (!workspace || savingSlug || !canManageWorkspace) return;
     const normalized = sanitizeWorkspaceSlug(slugDraft);
@@ -303,6 +336,8 @@ export function WorkspaceSettingsPage() {
       }
       setWorkspace(json.workspace);
       setSlugDraft(json.workspace.slug);
+      setSlugChangeOpen(false);
+      setSlugChangeImpact(null);
       toast.success("Workspace slug updated");
     } finally {
       setSavingSlug(false);
@@ -323,6 +358,7 @@ export function WorkspaceSettingsPage() {
         return;
       }
       toast.success("Workspace deleted");
+      setDeleteDialogOpen(false);
       scheduleRouterAction(() => router.push("/projects"));
     } finally {
       setDeleting(false);
@@ -559,33 +595,29 @@ export function WorkspaceSettingsPage() {
     <AppShell title="Settings" description="Workspace configuration and access control.">
       <div className="space-y-4">
         {workspaces.length > 1 ? (
-          <section className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-lg font-semibold text-foreground">Workspace</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Select a workspace to configure.</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {workspaces.map((item) => (
-                <Button
-                  key={item.id}
-                  variant={item.id === workspace.id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => switchWorkspace(item.id)}
-                >
-                  {item.name}
-                </Button>
-              ))}
+          <section className="rounded-xl border-2 border-primary/30 bg-card p-5">
+            <h3 className="text-lg font-semibold text-foreground">Active workspace</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Settings apply to the workspace you select. Double-check before destructive actions.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <WorkspaceSwitcher
+                workspaces={workspaces}
+                current={workspace}
+                onSelect={switchWorkspace}
+              />
+              <WorkspaceIdentityBadge workspace={workspace} />
             </div>
           </section>
-        ) : null}
+        ) : (
+          <section className="rounded-xl border border-border bg-card p-5">
+            <WorkspaceIdentityBadge workspace={workspace} />
+          </section>
+        )}
 
         <section className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-semibold text-foreground">Workspace details</h3>
-            <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
-              {workspace.kind}
-            </span>
-            <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
-              {workspace.role}
-            </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Rename your workspace. Only owners can save changes.
@@ -610,7 +642,8 @@ export function WorkspaceSettingsPage() {
         <section className="rounded-xl border border-border bg-card p-5">
           <h3 className="text-lg font-semibold text-foreground">Workspace slug</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Change the URL identifier used for public preview links.
+            Change the URL identifier used for public preview links. Old custom slugs stop working;
+            legacy name-id links may still resolve until you rename the workspace.
           </p>
           <div className="mt-4 flex flex-wrap items-end gap-3">
             <div className="min-w-65 flex-1 space-y-1.5">
@@ -624,11 +657,22 @@ export function WorkspaceSettingsPage() {
               />
               <p className="text-xs text-muted-foreground">Preview URL: {slugPreview}</p>
             </div>
-            <Button onClick={() => void saveSlug()} disabled={savingSlug || !canManageWorkspace}>
+            <Button onClick={requestSlugSave} disabled={savingSlug || !canManageWorkspace}>
               {savingSlug ? "Saving..." : "Save slug"}
             </Button>
           </div>
         </section>
+
+        <SlugChangeDialog
+          open={slugChangeOpen}
+          onOpenChange={(open) => {
+            setSlugChangeOpen(open);
+            if (!open) setSlugChangeImpact(null);
+          }}
+          impact={slugChangeImpact}
+          saving={savingSlug}
+          onConfirm={() => void saveSlug()}
+        />
 
         {workspace.kind === "team" ? (
           <section className="rounded-xl border border-border bg-card p-5">
@@ -869,12 +913,43 @@ export function WorkspaceSettingsPage() {
 
         <section className="rounded-xl border border-red-300 bg-red-50/40 p-5">
           <h3 className="text-lg font-semibold text-red-700">Danger zone</h3>
-          <p className="mt-1 text-sm text-red-700/90">
-            Delete workspace permanently. This removes all tokens and history.
-          </p>
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <div className="min-w-70 flex-1 space-y-1.5">
-              <Label htmlFor="delete-confirm">Type workspace name to confirm</Label>
+          <WorkspaceScopedBanner
+            workspace={workspace}
+            actionLabel="Permanent delete applies only to this workspace"
+            variant="destructive"
+            className="mt-3 border-red-200 bg-red-50/80"
+          />
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-red-800/90">
+            <li>All motion tokens and publish history are removed.</li>
+            <li>Public preview links for this slug stop working immediately.</li>
+            <li>Team invites and memberships for this workspace are revoked.</li>
+          </ul>
+          <div className="mt-4">
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteDialogOpen(true)}
+              disabled={!canManageWorkspace}
+            >
+              Delete workspace…
+            </Button>
+          </div>
+        </section>
+
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete {workspace.name}?</DialogTitle>
+              <DialogDescription>
+                This cannot be undone. Type the workspace name to confirm.
+              </DialogDescription>
+            </DialogHeader>
+            <WorkspaceScopedBanner
+              workspace={workspace}
+              actionLabel="You are about to delete"
+              variant="destructive"
+            />
+            <div className="space-y-1.5">
+              <Label htmlFor="delete-confirm">Workspace name</Label>
               <Input
                 id="delete-confirm"
                 value={confirmName}
@@ -883,15 +958,20 @@ export function WorkspaceSettingsPage() {
                 disabled={!canManageWorkspace}
               />
             </div>
-            <Button
-              variant="destructive"
-              onClick={() => void deleteWorkspace()}
-              disabled={!canDelete || deleting}
-            >
-              {deleting ? "Deleting..." : "Delete workspace"}
-            </Button>
-          </div>
-        </section>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => void deleteWorkspace()}
+                disabled={!canDelete || deleting}
+              >
+                {deleting ? "Deleting..." : "Delete workspace"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppShell>
   );

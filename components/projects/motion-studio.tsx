@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useTokenStore } from "@/lib/token-store";
+import type { WorkspaceSummary } from "@/lib/workspace-types";
 import { cn } from "@/lib/utils";
+import { WorkspaceIdentityBadge } from "@/components/workspace/workspace-identity-badge";
 
 import { PreviewPanel } from "./motion-studio/preview-panel";
 import { PropertiesPanel } from "./motion-studio/properties-panel";
@@ -14,10 +16,12 @@ import type { StudioSection } from "./motion-studio/shared";
 
 export function MotionStudio({
   embedded,
+  workspace,
   workspaceName,
   bootIntoMotionLab,
 }: {
   embedded?: boolean;
+  workspace?: Pick<WorkspaceSummary, "name" | "slug" | "kind" | "role">;
   workspaceName?: string;
   bootIntoMotionLab?: boolean;
 } = {}) {
@@ -55,7 +59,8 @@ export function MotionStudio({
         <TokenListPanel
           activeSection={activeSection}
           onSectionChange={setActiveSection}
-          workspaceName={workspaceName}
+          workspace={workspace}
+          workspaceName={workspace?.name ?? workspaceName}
         />
         <div className="min-w-0 flex-1">
           <div className="flex h-full min-h-0">

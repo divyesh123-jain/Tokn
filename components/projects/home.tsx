@@ -40,9 +40,12 @@ import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { WorkspaceScopedBanner } from "@/components/workspace/workspace-scoped-banner";
 import { Label } from "@/components/ui/label";
 import { scheduleRouterAction } from "@/lib/safe-router";
 import { workspaceApiFetchInit } from "@/lib/workspace-fetch";
@@ -87,6 +90,9 @@ export function ProjectsHome() {
   const [creating, setCreating] = React.useState(false);
   const [authUser, setAuthUser] = React.useState<AuthUser | null>(null);
   const [loggingOut, setLoggingOut] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<WorkspaceSummary | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = React.useState("");
+  const [deleting, setDeleting] = React.useState(false);
 
   const refresh = React.useCallback(async () => {
     const res = await fetch("/api/workspaces", workspaceApiFetchInit);
@@ -189,23 +195,31 @@ export function ProjectsHome() {
     }
   }
 
-  async function deleteWorkspace(id: string) {
-    if (!window.confirm("Delete this project? This cannot be undone.")) return;
-    const res = await fetch(`/api/workspaces/${id}`, {
-      ...workspaceApiFetchInit,
-      method: "DELETE",
-    });
-    if (res.status === 401) {
-      scheduleRouterAction(() => router.push("/signin"));
-      return;
+  async function deleteWorkspace() {
+    if (!deleteTarget || deleting) return;
+    if (deleteConfirmName.trim() !== deleteTarget.name) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/workspaces/${deleteTarget.id}`, {
+        ...workspaceApiFetchInit,
+        method: "DELETE",
+      });
+      if (res.status === 401) {
+        scheduleRouterAction(() => router.push("/signin"));
+        return;
+      }
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: string } | null;
+        toast.error(json?.error ?? "Could not delete project");
+        return;
+      }
+      toast.success("Project deleted");
+      setDeleteTarget(null);
+      setDeleteConfirmName("");
+      await refresh();
+    } finally {
+      setDeleting(false);
     }
-    if (!res.ok) {
-      const json = (await res.json().catch(() => null)) as { error?: string } | null;
-      toast.error(json?.error ?? "Could not delete project");
-      return;
-    }
-    toast.success("Project deleted");
-    await refresh();
   }
 
   async function signOut() {
@@ -394,7 +408,10 @@ export function ProjectsHome() {
                   onOpen={() =>
                     scheduleRouterAction(() => router.push(`/projects/${p.id}`))
                   }
-                  onDelete={() => void deleteWorkspace(p.id)}
+                  onDelete={() => {
+                    setDeleteConfirmName("");
+                    setDeleteTarget(p);
+                  }}
                   canDelete={p.role === "owner"}
                 />
               ))}
@@ -410,6 +427,57 @@ export function ProjectsHome() {
           )}
         </div>
       </main>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteConfirmName("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Delete {deleteTarget?.name}?</DialogTitle>
+            <DialogDescription>
+              This removes all tokens, releases, and public preview links for this workspace.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteTarget ? (
+            <WorkspaceScopedBanner
+              workspace={deleteTarget}
+              actionLabel="Permanent delete scoped to"
+              variant="destructive"
+            />
+          ) : null}
+          <div className="grid gap-2">
+            <Label htmlFor="delete-project-confirm">Type workspace name to confirm</Label>
+            <Input
+              id="delete-project-confirm"
+              value={deleteConfirmName}
+              onChange={(e) => setDeleteConfirmName(e.target.value)}
+              placeholder={deleteTarget?.name ?? ""}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                !deleteTarget ||
+                deleting ||
+                deleteConfirmName.trim() !== deleteTarget.name
+              }
+              onClick={() => void deleteWorkspace()}
+            >
+              {deleting ? "Deleting…" : "Delete project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
@@ -551,8 +619,9 @@ function ProjectCard({
       <div className="flex items-start justify-between gap-2 p-3">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{project.name}</div>
+          <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">{project.slug}</div>
           <div className="mt-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-            motion · library
+            {project.kind} · {project.role}
           </div>
         </div>
         {canDelete ? (

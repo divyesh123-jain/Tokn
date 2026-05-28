@@ -5,8 +5,10 @@ import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db";
-import { motionTokens, workspaceReleases, workspaces } from "@/db/schema";
+import { motionTokens, workspaceMembers, workspaceReleases, workspaces } from "@/db/schema";
 import { getSessionUserState, getUserWorkspaces } from "@/lib/auth-helpers";
+import { workspaceKindLabel, workspaceRoleLabel } from "@/lib/workspace-identity";
+import { buildWorkspacePreviewSlug } from "@/lib/workspace-slug";
 
 type SnapshotToken = {
   name: string;
@@ -111,9 +113,21 @@ export default async function ReleasesPage({
   const workspaceIds = userWorkspaceRows.map((w) => w.workspaceId);
   const db = getDb();
   const workspaceRows = await db
-    .select({ id: workspaces.id, name: workspaces.name, slug: workspaces.slug })
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      slug: workspaces.slug,
+      kind: workspaces.kind,
+      role: workspaceMembers.role,
+    })
     .from(workspaces)
-    .where(inArray(workspaces.id, workspaceIds));
+    .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+    .where(
+      and(
+        inArray(workspaces.id, workspaceIds),
+        eq(workspaceMembers.userId, session.user.userId),
+      ),
+    );
 
   const byName = [...workspaceRows].sort((a, b) => a.name.localeCompare(b.name));
   const params = await searchParams;
@@ -193,6 +207,15 @@ export default async function ReleasesPage({
               </Link>
             ))}
           </div>
+          <p className="mt-3 text-sm font-semibold text-foreground">{selectedWorkspace.name}</p>
+          <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+            {selectedWorkspace.slug ||
+              buildWorkspacePreviewSlug(selectedWorkspace.name, selectedWorkspace.id)}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {workspaceKindLabel[selectedWorkspace.kind as keyof typeof workspaceKindLabel]} ·{" "}
+            {workspaceRoleLabel[selectedWorkspace.role as keyof typeof workspaceRoleLabel]}
+          </p>
         </section>
 
         {!releaseDiffsAvailable ? (
@@ -214,7 +237,10 @@ export default async function ReleasesPage({
             const publishedAt = new Date(release.publishedAt);
             const previousRelease = releases[index + 1] ?? null;
             const diff = diffReleases(release, previousRelease);
-            const pinnedPath = `/preview/${selectedWorkspace.slug}/v/${encodeURIComponent(release.version as string)}`;
+            const previewSlug =
+              selectedWorkspace.slug ||
+              buildWorkspacePreviewSlug(selectedWorkspace.name, selectedWorkspace.id);
+            const pinnedPath = `/preview/${previewSlug}/v/${encodeURIComponent(release.version as string)}`;
             const pinnedUrl = appOrigin ? `${appOrigin}${pinnedPath}` : pinnedPath;
 
             return (

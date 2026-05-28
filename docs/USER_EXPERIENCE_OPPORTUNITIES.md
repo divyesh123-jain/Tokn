@@ -1,6 +1,6 @@
 # Tokn — UX and product opportunities
 
-Ideas to improve how it feels to use Tokn day to day. Complements [USER_FEATURES.md](./USER_FEATURES.md) (what exists today). Nothing here is committed scope; use it for prioritization and design.
+Ideas to improve how it feels to use Tokn day to day. Complements [USER_FEATURES.md](./USER_FEATURES.md) (what exists today). For an **ordered backlog** of what to build next, see [ROADMAP_FEATURES.md](./ROADMAP_FEATURES.md); for **delivery quality** (edges, errors, permissions), see [PERFECT.md](./PERFECT.md). Nothing here is committed scope; use it for prioritization and design.
 
 **Teams:** Core team workspaces (invites, roles, publish permissions) are **already shipped** — see [Team workspaces (done vs polish)](./USER_FEATURES.md#team-workspaces-done-vs-polish) in `USER_FEATURES.md`. Items below are mostly **v2+** unless noted.
 

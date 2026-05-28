@@ -39,7 +39,16 @@ Tokn lets product teams define, share, and enforce motion tokens across their ap
 
 ## User feature summary
 
-Implemented product behavior from an end-user perspective: [docs/USER_FEATURES.md](docs/USER_FEATURES.md). Possible UX and product upgrades: [docs/USER_EXPERIENCE_OPPORTUNITIES.md](docs/USER_EXPERIENCE_OPPORTUNITIES.md).
+Implemented product behavior from an end-user perspective: [docs/USER_FEATURES.md](docs/USER_FEATURES.md). UX idea pool: [docs/USER_EXPERIENCE_OPPORTUNITIES.md](docs/USER_EXPERIENCE_OPPORTUNITIES.md). **Prioritization rubric and edge-case checklist:** [docs/PERFECT.md](docs/PERFECT.md). **Ordered backlog of features to build:** [docs/ROADMAP_FEATURES.md](docs/ROADMAP_FEATURES.md).
+
+### How we prioritize
+
+1. **Reduces fear** — Wrong workspace, bad publish, data loss, opaque errors ([PERFECT.md](docs/PERFECT.md) §1–4, §6, §9, §11).
+2. **Shortens handoff** — Engineers get correct, versioned artifacts (TS/JSON today; CSS/Tailwind workspace exports and CI paths on the roadmap — [ROADMAP_FEATURES.md](docs/ROADMAP_FEATURES.md) P1).
+3. **Supports teams** — Roles, review, accountability, activity ([ROADMAP_FEATURES.md](docs/ROADMAP_FEATURES.md) P2).
+4. **Feels fast** — Skeletons, optimistic UI with honest reconciliation, mobile read-only where needed ([ROADMAP_FEATURES.md](docs/ROADMAP_FEATURES.md) P3).
+
+Near-term execution order is **P0 → P1 → P2** unless a small P3 win unblocks activation; see the roadmap doc for the full table.
 
 ## Information Architecture
 
@@ -162,16 +171,11 @@ type MotionToken = {
 - Native runtime SDKs (iOS/Android).
 - Marketplace/public token discovery.
 
-## Feature System Backlog (Execution Order)
+## Feature system backlog
 
-1. Authentication, workspaces, roles
-2. Token schema and persistence
-3. Authoring UI and validation
-4. Publish/version engine
-5. SDK generator and package delivery
-6. Preview lab and share links
-7. Lint/CI enforcement package
-8. Team analytics and adoption reporting
+Foundation items above are largely **shipped** in the dashboard (auth, workspaces, roles, tokens, publish, releases, SDK TS/JSON export, preview, team invites). Ongoing and upcoming work is tracked in **[docs/ROADMAP_FEATURES.md](docs/ROADMAP_FEATURES.md)** by tier (P0–P4), aligned with **[docs/PERFECT.md](docs/PERFECT.md)**.
+
+Legacy ordering for reference: token schema and persistence → authoring → publish/version → SDK outputs → preview/share → lint/CI for consumers → analytics and team surfaces (many covered; consumer lint package and npm distribution remain roadmap).
 
 ## Product Style Foundation
 
@@ -278,23 +282,11 @@ Ship curated **Tokn token sets** tuned for shadcn/Radix surfaces: overlay fade a
 - Teams may bypass SDK for edge cases -> add escape-hatch policy with mandatory intent annotation.
 - Overly rigid tokens can block creativity -> support local overrides with auditable metadata.
 
-## Immediate Build Plan
+## Immediate build plan
 
-1. Lock token schema and naming.
-2. Build token CRUD + publish flow.
-3. Generate typed SDK output.
-4. Add 6-8 canonical preview components.
-5. Add lint rule for hardcoded duration/easing values.
+Follow **[docs/ROADMAP_FEATURES.md](docs/ROADMAP_FEATURES.md)** — start with **P0** (trust and errors), then **P1** (workspace-level CSS/Tailwind exports, release notes, headless/CI handoff). Use **[docs/PERFECT.md](docs/PERFECT.md)** as a QA companion so shipped work clears edge cases, not only happy paths.
 
-## Next Session Checklist
-
-Pick one and we implement directly:
-
-- Token schema (`packages/token-schema`)
-- Dashboard information architecture (`apps/web`)
-- Typography system and theme tokens
-- SDK generator output format
-- Enforcement rule spec (`eslint-plugin-tokn`)
+Pick-one spikes when exploring: SDK multi-format generator, `eslint-plugin-tokn` spec, or activity feed data model — whichever unblocks the active tier.
 
 ## Deployment Readiness
 
